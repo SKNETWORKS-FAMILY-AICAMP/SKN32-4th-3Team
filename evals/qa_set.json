@@ -1,0 +1,274 @@
+[
+  {
+    "id": "q001",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "종이컵은 어떻게 분리배출하나요?",
+    "reference_answer": "내용물을 비우고 물로 헹군 뒤 압착하여 종이류로 배출합니다. 양면 코팅된 종이컵은 재활용이 안 되므로 종량제봉투에 버립니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q002",
+    "type": "single_fact",
+    "region": "cheonan",
+    "question": "달걀 껍질은 음식물쓰레기인가요?",
+    "reference_answer": "아닙니다. 달걀·메추리알 껍질은 석회질이 많아 사료로 부적합하여 일반쓰레기(종량제봉투)로 배출해야 합니다.",
+    "forbidden_mention": ["음식물쓰레기로 배출"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q003",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "부탄가스 캔은 어떻게 버려요?",
+    "reference_answer": "바람이 잘 통하는 곳에서 노즐을 눌러 가스를 완전히 제거한 후 금속캔으로 분리배출합니다. 내용물이 남아 있으면 특수규격마대로 배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q004",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "깨진 유리컵은 재활용 되나요?",
+    "reference_answer": "깨진 유리는 재활용이 되지 않습니다. 신문지에 싸서 소량은 종량제봉투, 다량은 특수규격마대로 배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q005",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "뽁뽁이(에어캡)는 어디에 버리나요?",
+    "reference_answer": "뽁뽁이는 비닐류로 분리배출이 가능합니다. 택배봉투, 과자 비닐 등과 함께 투명 봉투에 모아 배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q006",
+    "type": "single_fact",
+    "region": "cheonan",
+    "question": "형광등은 어떻게 버리나요?",
+    "reference_answer": "형광등은 전용 수거함에 배출합니다. 깨진 형광등은 종량제봉투에 버립니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q007",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "수박 껍질은 음식물쓰레기예요?",
+    "reference_answer": "네, 수박 껍질은 음식물쓰레기로 배출합니다. 다만 수박 씨는 일반쓰레기입니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q008",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "랩은 비닐로 분리배출 할 수 있나요?",
+    "reference_answer": "아닙니다. 랩은 분리배출이 불가하여 종량제봉투에 버려야 합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q009",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "폐의약품은 어디에 버리나요?",
+    "reference_answer": "폐의약품은 약국, 보건소, 주민센터 등에 설치된 폐의약품 전용 수거함에 배출합니다. 서울은 우체통에 투입하는 방법도 가능합니다.",
+    "forbidden_mention": ["종량제봉투"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q010",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "안 쓰는 세탁기는 어떻게 처리해요?",
+    "reference_answer": "세탁기는 폐가전 무상방문수거 서비스(1599-0903)를 이용하면 무료로 수거됩니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q011",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "옷걸이는 분리배출 가능한가요?",
+    "reference_answer": "옷걸이는 혼합재질이라 분리배출이 안 되고 종량제봉투에 버려야 합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q012",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "소파를 버리려면 어떻게 해야 하나요?",
+    "reference_answer": "소파는 대형폐기물로 지자체에 사전 신고하고 수수료를 납부한 뒤 배출해야 합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q013",
+    "type": "region_specific",
+    "region": "busan_namgu",
+    "question": "쓰레기 배출 시간이 어떻게 되나요?",
+    "reference_answer": "부산 남구는 저녁 7시부터 밤 11시 사이에 대문 앞이나 업소 출입구에 배출합니다.",
+    "forbidden_mention": ["서울", "천안", "세종"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q014",
+    "type": "region_specific",
+    "region": "busan_namgu",
+    "question": "음식물쓰레기는 어떻게 버리나요?",
+    "reference_answer": "부산 남구는 음식물쓰레기 전용용기에 담고 납부필증을 부착하여 배출합니다. 전용용기는 지정 판매소에서 구입합니다.",
+    "forbidden_mention": ["서울", "천안", "RFID"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q015",
+    "type": "region_specific",
+    "region": "busan_namgu",
+    "question": "비닐은 무슨 요일에 버리나요?",
+    "reference_answer": "부산 남구는 비닐류를 매주 월요일에 배출합니다.",
+    "forbidden_mention": ["서울", "천안", "제주"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q016",
+    "type": "region_specific",
+    "region": "cheonan",
+    "question": "투명 페트병 별도 배출 요일이 있나요?",
+    "reference_answer": "네, 천안시는 투명 폐페트병 분리배출 시범사업에 따라 목요일에 투명 페트병만 별도로 배출합니다.",
+    "forbidden_mention": ["서울", "부산"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q017",
+    "type": "region_specific",
+    "region": "jeju",
+    "question": "제주에서 재활용품은 어디에 버리나요?",
+    "reference_answer": "제주는 집 앞 문전수거가 아니라 클린하우스나 재활용도움센터에 직접 가져가 배출합니다.",
+    "forbidden_mention": ["서울", "부산", "천안"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q018",
+    "type": "region_specific",
+    "region": "jeju",
+    "question": "제주에서 음식물쓰레기 배출 방법은?",
+    "reference_answer": "제주는 클린하우스나 재활용도움센터의 RFID 개별계량장비에 티머니 교통카드를 대고 무게만큼 수수료를 결제하여 배출합니다.",
+    "forbidden_mention": ["전용봉투", "납부필증"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q019",
+    "type": "region_specific",
+    "region": "sejong",
+    "question": "세종시에서 일반쓰레기는 어디에 버리나요?",
+    "reference_answer": "세종시 동지역은 종량제봉투에 담아 자동크린넷 투입구에 투입하고, 읍면지역은 지정 장소에 내놓는 문전수거 방식입니다.",
+    "forbidden_mention": ["클린하우스"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q020",
+    "type": "region_specific",
+    "region": "incheon_michuhol",
+    "question": "인천 미추홀구 재활용품 배출 요일은?",
+    "reference_answer": "인천 미추홀구는 동별로 두 그룹으로 나뉩니다. 월·수·금 배출 동과 화·목·일 배출 동이 있으며, 저녁 시간에 투명봉투에 담아 문앞에 배출합니다.",
+    "forbidden_mention": ["서울", "부산"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q021",
+    "type": "region_specific",
+    "region": "incheon_michuhol",
+    "question": "인천 미추홀구에서 대형폐기물은 어떻게 버려요?",
+    "reference_answer": "인터넷 신고, 빼기 앱, 동 행정복지센터 방문, 지정판매소 스티커 구매 등의 방법이 있습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q022",
+    "type": "region_specific",
+    "region": "sejong",
+    "question": "세종시에서 폐의약품은 어떻게 버리나요?",
+    "reference_answer": "세종시는 우체통 폐의약품 배출 시행 지역입니다. 봉투에 담아 겉면에 '폐의약품'이라고 적고 밀봉 후 우체통에 투입합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q023",
+    "type": "cross_reference",
+    "region": "seoul",
+    "question": "분리배출을 안 하면 벌금이 있나요?",
+    "reference_answer": "네, 폐기물관리법에 따라 분리배출 의무가 있으며 위반 시 과태료가 부과될 수 있습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q024",
+    "type": "cross_reference",
+    "region": "seoul",
+    "question": "일회용 플라스틱컵 카페에서 써도 되나요?",
+    "reference_answer": "매장 내 일회용 플라스틱컵은 현재 규제 대상입니다. 위반 시 최대 300만원 과태료가 부과될 수 있습니다. 다만 종이컵은 규제에서 제외된 상태입니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q025",
+    "type": "cross_reference",
+    "region": "seoul",
+    "question": "텀블러 쓰면 혜택이 있나요?",
+    "reference_answer": "탄소중립포인트제의 녹색생활 실천 항목에 텀블러·다회용컵 이용이 포함되어 있어 포인트를 적립할 수 있습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q026",
+    "type": "cross_reference",
+    "region": "seoul",
+    "question": "1회용컵 보증금제가 뭔가요?",
+    "reference_answer": "일회용컵에 보증금 300원을 내고 반납 시 돌려받는 제도로, 세종과 제주에서 시행되고 있습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true
+  },
+  {
+    "id": "q027",
+    "type": "no_answer",
+    "region": "busan_namgu",
+    "question": "대구 수성구 음식물쓰레기 배출 요일은 언제인가요?",
+    "reference_answer": "대구 수성구 자료는 보유하고 있지 않아 안내드릴 수 없습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false
+  },
+  {
+    "id": "q028",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "의료폐기물은 어떻게 처리하나요?",
+    "reference_answer": "의료폐기물은 별도의 처리 절차를 따라야 하며, 관할 보건소나 전문 처리업체에 문의해야 합니다. 폐의약품의 경우 약국, 보건소 등의 전용 수거함에 배출합니다.",
+    "forbidden_mention": ["종량제봉투", "분리배출함"],
+    "should_have_answer": true
+  },
+  {
+    "id": "q029",
+    "type": "no_answer",
+    "region": "seoul",
+    "question": "전기차 폐배터리는 어디에 버리나요?",
+    "reference_answer": "전기차 폐배터리 관련 자료는 보유하고 있지 않습니다.",
+    "forbidden_mention": ["전지류 수거함", "전용 수거함에 배출", "주민센터"],
+    "should_have_answer": false,
+    "note": "폐건전지 안내를 전기차 폐배터리에 적용하면 오답."
+  },
+  {
+    "id": "q030",
+    "type": "no_answer",
+    "region": "seoul",
+    "question": "오늘 날씨 어때?",
+    "reference_answer": "관련 자료를 찾을 수 없습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false,
+    "note": "완전히 무관한 주제."
+  }
+]

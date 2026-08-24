@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}{{ board.title }} - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  <nav class="land-nav">
+    <a class="land-nav-left" href="{% url 'home' %}" style="text-decoration:none;color:inherit">
+      <span class="land-logo-icon">🌿</span><strong class="land-logo-text">Ecobot</strong>
+    </a>
+    <div class="land-nav-right">
+      <a class="btn btn-outline btn-sm" href="{% url 'boards:list' %}">← 목록</a>
+      {% if user.is_authenticated and board.author_id == user.id %}
+        <a class="btn btn-outline btn-sm" href="{% url 'boards:update' board.pk %}">수정</a>
+        <form method="post" action="{% url 'boards:delete' board.pk %}" style="display:inline"
+              onsubmit="return confirm('이 글을 삭제할까요?')">
+          {% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">삭제</button>
+        </form>
+      {% endif %}
+    </div>
+  </nav>
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head">
+      <h1>{{ board.title }}</h1>
+    </div>
+    <p class="board-meta">
+      {{ board.author.display_name }} · {{ board.get_region_display }} ·
+      {{ board.created_at|date:"Y.m.d H:i" }} · 조회 {{ board.read_count }}
+      {% if board.updated_at|date:"YmdHi" != board.created_at|date:"YmdHi" %}
+        · <em>{{ board.updated_at|date:"Y.m.d H:i" }} 수정됨</em>
+      {% endif %}
+    </p>
+    {% if board.attachment %}
+      <p class="board-attach">📎 <a href="{{ board.attachment.url }}" download>첨부파일 내려받기</a></p>
+    {% endif %}
+    <pre class="doc-pre">{{ board.content }}</pre>
+  </div>
+</div>
+{% endblock %}

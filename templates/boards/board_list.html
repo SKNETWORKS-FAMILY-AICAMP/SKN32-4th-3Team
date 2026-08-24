@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}커뮤니티 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  <nav class="land-nav">
+    <a class="land-nav-left" href="{% url 'home' %}" style="text-decoration:none;color:inherit">
+      <span class="land-logo-icon">🌿</span><strong class="land-logo-text">Ecobot</strong>
+    </a>
+    <div class="land-nav-right">
+      <a class="btn btn-outline btn-sm" href="{% url 'chat:room' %}">챗봇</a>
+      {% if user.is_authenticated %}
+        <a class="btn btn-primary btn-sm" href="{% url 'boards:create' %}">+ 글쓰기</a>
+      {% else %}
+        <a class="btn btn-primary btn-sm" href="{% url 'members:login' %}?next={% url 'boards:create' %}">로그인하고 글쓰기</a>
+      {% endif %}
+    </div>
+  </nav>
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head">
+      <h1>분리배출 커뮤니티</h1>
+      <span style="color:#888;font-size:13px">우리 동네에서 실제로 이렇게 버렸다 — 경험과 질문을 나눠 주세요</span>
+    </div>
+    <form method="get" class="board-filter">
+      <select name="region" class="region-dropdown" onchange="this.form.submit()">
+        <option value="">전체 지역</option>
+        {% for code, label in region_choices %}
+          <option value="{{ code }}" {% if region == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="kw" value="{{ kw }}" placeholder="제목·내용 검색">
+      <button type="submit" class="btn btn-outline btn-sm">검색</button>
+    </form>
+    <table class="admin-table">
+      <thead><tr><th>제목</th><th>작성자</th><th>지역</th><th>조회</th><th>작성일</th></tr></thead>
+      <tbody>
+      {% for board in boards %}
+        <tr>
+          <td><a href="{% url 'boards:detail' board.pk %}">{{ board.title }}</a>
+            {% if board.attachment %}<span title="첨부파일 있음">📎</span>{% endif %}</td>
+          <td>{{ board.author.display_name }}</td>
+          <td>{{ board.get_region_display }}</td>
+          <td>{{ board.read_count }}</td>
+          <td>{{ board.created_at|date:"Y.m.d" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="stat-placeholder">
+          {% if kw or region %}조건에 맞는 글이 없습니다.{% else %}아직 글이 없습니다. 첫 글을 남겨 보세요!{% endif %}
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if is_paginated %}
+    <div class="paging">
+      {% if page_obj.has_previous %}
+        <a href="?{% if qs_keep %}{{ qs_keep }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">‹ 이전</a>
+      {% endif %}
+      <span class="paging-now">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?{% if qs_keep %}{{ qs_keep }}&amp;{% endif %}page={{ page_obj.next_page_number }}">다음 ›</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

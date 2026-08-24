@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="landing">
+      <!-- 네비게이션 -->
+      <nav class="land-nav">
+        <div class="land-nav-left">
+          <span class="land-logo-icon">🌿</span>
+          <strong class="land-logo-text">Ecobot</strong>
+        </div>
+        <div class="land-nav-right">
+          <a class="btn btn-primary btn-sm" href="{% url 'chat:room' %}">시작하기</a>
+        </div>
+      </nav>
+
+      <!-- 히어로 -->
+      <section class="land-hero">
+        <h1>우리 동네 <span class="land-accent">환경 실천</span>,<br>AI가 알려드려요</h1>
+        <p>환경부 공식 가이드와 지역별 조례를 기반으로<br>분리배출 · 음식물쓰레기 · 에너지 절약을 안내합니다</p>
+        <div class="land-hero-btns">
+          <a class="btn btn-primary btn-lg" href="{% url 'chat:room' %}">시작하기</a>
+          <a class="btn btn-outline btn-lg" href="{% url 'service' %}">서비스 안내</a>
+        </div>
+      </section>
+
+      <!-- 공지 안내 바 -->
+      <div class="land-notice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>환경부 가이드라인 및 관련 법령을 기반으로 답변합니다. 법적 효력이 있는 공식 답변이 아님을 유의해 주세요.</span>
+      </div>
+
+      <!-- 기능 카드 -->
+      <section class="land-features" id="land-features">
+        <div class="land-feat" onclick="location.href='{% url 'guide' 'recycling' %}'">
+          <div class="land-feat-icon" style="background:#E8F5EE">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 5.5l4.876-2.346"/><path d="m14.5 9 3-3-3-3"/></svg>
+          </div>
+          <h3>분리배출 안내</h3>
+          <p>품목별 분리수거 방법을<br>지역 기준으로 정확하게</p>
+        </div>
+        <div class="land-feat" onclick="location.href='{% url 'guide' 'food-waste' %}'">
+          <div class="land-feat-icon" style="background:#FFF8E1">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4890B" stroke-width="2"><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.36 1.35 2.4 2.4 0 0 1-1.67 3.83"/></svg>
+          </div>
+          <h3>음식물쓰레기</h3>
+          <p>배출 기준, 감량 방법,<br>수수료 안내까지</p>
+        </div>
+        <div class="land-feat" onclick="location.href='{% url 'guide' 'energy' %}'">
+          <div class="land-feat-icon" style="background:#E8F0FB">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B7DD8" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>
+          <h3>에너지 절약</h3>
+          <p>전기·가스 절약 실천법과<br>지원 제도 안내</p>
+        </div>
+      </section>
+
+      <!-- 하단 2컬럼: 지역 + 서비스 안내 -->
+      <section class="land-bottom">
+        <div class="land-card" id="land-regions">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            지원 지역
+          </h3>
+          <div class="land-regions">
+            <div class="land-region" onclick="location.href='{% url 'guide' 'region-seoul' %}'">
+              <span><span class="land-rdot" style="background:#2D8B4E"></span>서울특별시</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="location.href='{% url 'guide' 'region-cheonan' %}'">
+              <span><span class="land-rdot" style="background:#3B7DD8"></span>천안시</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="location.href='{% url 'guide' 'region-busan' %}'">
+              <span><span class="land-rdot" style="background:#D4890B"></span>부산 남구</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="location.href='{% url 'guide' 'region-incheon' %}'">
+              <span><span class="land-rdot" style="background:#7B2D8B"></span>인천 미추홀구</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="location.href='{% url 'guide' 'region-sejong' %}'">
+              <span><span class="land-rdot" style="background:#D44B0B"></span>세종시</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+            <div class="land-region" onclick="location.href='{% url 'guide' 'region-jeju' %}'">
+              <span><span class="land-rdot" style="background:#0B8BD4"></span>제주도</span>
+              <span class="land-region-go">바로가기 →</span>
+            </div>
+          </div>
+        </div>
+        <div class="land-card" id="land-info">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            서비스 안내
+          </h3>
+          <div class="land-info-list">
+            <div class="land-info-row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <div><strong>24시간 운영</strong><span>언제든 환경 실천 관련 질문 가능</span></div>
+            </div>
+            <div class="land-info-row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+              <div><strong>환경부 공식 데이터</strong><span>가이드라인 및 관련 법령 기반 답변</span></div>
+            </div>
+            <div class="land-info-row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              <div><strong>지역 맞춤 안내</strong><span>지자체별 조례와 규정 반영</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 푸터 -->
+      <footer class="land-footer">
+        <span>© 2026 Ecobot · 생활환경 실천 안내 서비스</span>
+        <div class="land-footer-links">
+          <a href="#" onclick="event.preventDefault()">이용약관</a>
+          <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
+          <a href="#" onclick="event.preventDefault()">문의하기</a>
+        </div>
+      </footer>
+    </div>
+  
+{% endblock %}

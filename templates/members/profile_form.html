@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}프로필 수정 - Ecobot{% endblock %}
+{% block content %}
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-logo"><div class="logo-icon">✏️</div><h1>프로필 수정</h1>
+      <p class="login-subtitle">거주 지역을 바꾸면 챗봇 기본 지역이 바뀝니다</p></div>
+    {% if form.non_field_errors %}<div class="form-errors-top">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group"><label for="id_display_name">이름</label>
+        <input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:'' }}" required>
+        {% for e in form.display_name.errors %}<p class="form-error">{{ e }}</p>{% endfor %}</div>
+      <div class="form-group"><label for="id_email">이메일</label>
+        <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" required>
+        {% for e in form.email.errors %}<p class="form-error">{{ e }}</p>{% endfor %}</div>
+      <div class="form-group"><label for="id_region">거주 지역</label>
+        <select name="region" id="id_region" class="region-dropdown">
+          {% for code, label in form.fields.region.choices %}
+            <option value="{{ code }}" {% if form.region.value == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="form-group"><label for="id_phone">전화번호</label>
+        <input type="text" name="phone" id="id_phone" value="{{ form.phone.value|default:'' }}" placeholder="010-0000-0000">
+        {% for e in form.phone.errors %}<p class="form-error">{{ e }}</p>{% endfor %}</div>
+      <button type="submit" class="btn btn-primary btn-full">저장</button>
+    </form>
+    <p class="login-link"><a href="{% url 'members:profile' %}">← 프로필로 돌아가기</a></p>
+  </div>
+</div>
+{% endblock %}

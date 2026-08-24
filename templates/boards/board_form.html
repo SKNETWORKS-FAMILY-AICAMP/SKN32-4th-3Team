@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}{% if form.instance.pk %}글 수정{% else %}글쓰기{% endif %} - Ecobot{% endblock %}
+{% block content %}
+<div class="login-container">
+  <div class="login-card board-form-card">
+    <div class="login-logo">
+      <div class="logo-icon">✏️</div>
+      <h1>{% if form.instance.pk %}글 수정{% else %}새 글 작성{% endif %}</h1>
+      <p class="login-subtitle">우리 동네 분리배출 경험·질문을 나눠 주세요</p>
+    </div>
+    {% if form.non_field_errors %}<div class="form-errors-top">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>{% endif %}
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_title">제목</label>
+        <input type="text" name="title" id="id_title" placeholder="예: 부산 남구 스티로폼 배출 요일 문의"
+               value="{{ form.title.value|default:'' }}" required>
+        {% for e in form.title.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_region">지역</label>
+        <select name="region" id="id_region" class="region-dropdown">
+          {% for code, label in form.fields.region.choices %}
+            <option value="{{ code }}" {% if form.region.value == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {% for e in form.region.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_content">내용</label>
+        <textarea name="content" id="id_content" rows="10" required
+                  placeholder="예: 남구는 스티로폼을 무슨 요일에 내놔야 하나요? 관리사무소 공지에는...">{{ form.content.value|default:'' }}</textarea>
+        {% for e in form.content.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_attachment">첨부파일 (선택)</label>
+        {% if form.instance.attachment %}
+          <p style="font-size:12.5px;color:#888;margin:0 0 6px">현재: {{ form.instance.attachment.name }} — 새 파일을 올리면 교체됩니다</p>
+        {% endif %}
+        <input type="file" name="attachment" id="id_attachment">
+        {% for e in form.attachment.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">{% if form.instance.pk %}수정 저장{% else %}등록{% endif %}</button>
+    </form>
+    <p class="login-link">
+      {% if form.instance.pk %}
+        <a href="{% url 'boards:detail' form.instance.pk %}">← 글로 돌아가기</a>
+      {% else %}
+        <a href="{% url 'boards:list' %}">← 목록으로</a>
+      {% endif %}
+    </p>
+  </div>
+</div>
+{% endblock %}
