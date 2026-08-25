@@ -1,0 +1,14 @@
+.idea/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+db.sqlite3
+media/
+# FAISS 인덱스와 임베딩 캐시는 재생성 가능하므로 커밋하지 않습니다.
+vector_db/*.faiss
+vector_db/chunks.json
+vector_db/embedding_cache.json
+vector_db/langchain/
+

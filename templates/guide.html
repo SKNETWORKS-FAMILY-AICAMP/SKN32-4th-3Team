@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}{{ guide.title }} - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  <nav class="land-nav">
+    <a class="land-nav-left" href="{% url 'home' %}" style="cursor:pointer;text-decoration:none;color:inherit">
+      <span class="land-logo-icon">🌿</span>
+      <strong class="land-logo-text">Ecobot</strong>
+    </a>
+    <div class="land-nav-right">
+      <a class="btn btn-outline btn-sm" href="{% url 'home' %}">← 홈으로</a>
+      <a class="btn btn-primary btn-sm" href="{% url 'chat:room' %}">챗봇 상담</a>
+    </div>
+  </nav>
+  <div class="guide-content">
+    <div class="guide-header" style="border-left: 4px solid {{ guide.icon }}; background: {{ guide.color }};">
+      <h1>{{ guide.title }}</h1>
+      <p>환경부 가이드라인 및 지역 조례 기반</p>
+    </div>
+    <div class="guide-sections-grid">
+      {% for sec in guide.sections %}
+        <div class="guide-section{% if forloop.last and odd %} full-width{% endif %}">
+          <h2>{{ sec.heading }}</h2>
+          <ul>{% for item in sec.items %}<li>{{ item }}</li>{% endfor %}</ul>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="guide-cta">
+      <p>더 궁금한 점이 있으신가요?</p>
+      <a class="btn btn-primary" href="{% url 'chat:room' %}">챗봇에게 질문하기</a>
+    </div>
+  </div>
+  <footer class="land-footer">
+    <span>© 2026 Ecobot · 생활환경 실천 안내 서비스</span>
+    <div class="land-footer-links"><a href="#" onclick="event.preventDefault()">이용약관</a><a href="#" onclick="event.preventDefault()">개인정보처리방침</a></div>
+  </footer>
+</div>
+{% endblock %}
