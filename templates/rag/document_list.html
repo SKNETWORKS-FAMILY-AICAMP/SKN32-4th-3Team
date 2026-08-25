@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}문서 목록 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  <nav class="land-nav">
+    <a class="land-nav-left" href="{% url 'home' %}" style="text-decoration:none;color:inherit">
+      <span class="land-logo-icon">🌿</span><strong class="land-logo-text">Ecobot</strong>
+    </a>
+    <div class="land-nav-right">
+      <a class="btn btn-outline btn-sm" href="{% url 'chat:room' %}">챗봇</a>
+      <a class="btn btn-primary btn-sm" href="{% url 'rag:upload' %}">+ 문서 업로드</a>
+    </div>
+  </nav>
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head">
+      <h1>문서 목록</h1>
+      <span style="color:#888;font-size:13px">내가 올린 문서와 공용 법령·가이드가 검색 근거로 쓰입니다</span>
+    </div>
+    <table class="admin-table">
+      <thead><tr><th>문서명</th><th>유형</th><th>지역</th><th></th></tr></thead>
+      <tbody>
+      {% for doc in documents %}
+        <tr>
+          <td><a href="{% url 'rag:document' doc.pk %}">{{ doc.title }}</a></td>
+          <td>{{ doc.get_source_type_display }}</td>
+          <td>{{ doc.get_region_display|default:"전국 공통" }}</td>
+          <td style="text-align:right">
+            {% if doc.source_type == 'manual' %}
+              <form method="post" action="{% url 'rag:document_delete' doc.pk %}" style="display:inline"
+                    onsubmit="return confirm('이 문서를 삭제하고 색인에서 제거할까요?')">
+                {% csrf_token %}<button class="btn-text" type="submit">삭제</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="stat-placeholder">문서가 없습니다. 공용 문서는 `python manage.py seed_docs` 로 적재합니다.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

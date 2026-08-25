@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}{{ document.title }} - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  <nav class="land-nav">
+    <a class="land-nav-left" href="{% url 'home' %}" style="text-decoration:none;color:inherit">
+      <span class="land-logo-icon">🌿</span><strong class="land-logo-text">Ecobot</strong>
+    </a>
+    <div class="land-nav-right">
+      <a class="btn btn-outline btn-sm" href="{% url 'rag:documents' %}">← 문서 목록</a>
+      {% if document.source_file %}<a class="btn btn-primary btn-sm" href="?file=1">원본 파일</a>{% endif %}
+    </div>
+  </nav>
+  <div class="docs-wrap">
+    <div class="docs-head">
+      <h1>{{ document.title }}</h1>
+      <span style="color:#888;font-size:13px">{{ document.get_source_type_display }} · {{ document.get_region_display|default:"전국 공통" }}</span>
+    </div>
+    <pre class="doc-pre">{{ document.content_text }}</pre>
+  </div>
+</div>
+{% endblock %}

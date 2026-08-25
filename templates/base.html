@@ -1,0 +1,13 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Ecobot - 생활 속 환경 실천 안내{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+{% block content %}{% endblock %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

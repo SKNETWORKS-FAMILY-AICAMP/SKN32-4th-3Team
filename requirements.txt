@@ -1,0 +1,33 @@
+# ── 웹 프레임워크 ──
+Django>=5.0,<6.0
+python-dotenv
+mysqlclient
+Pillow                  # Member.photo (ImageField) 용
+
+# ── RAG 파이프라인 (3차에서 그대로 유지) ──
+faiss-cpu
+numpy
+pypdf
+
+# ── LLM / 임베딩 ──
+google-genai
+openai
+sentence-transformers
+
+# ── LangChain (3차 병행 경로. 안 쓰면 이 블록 제거 가능) ──
+langchain-classic
+langchain-community<0.4
+langchain-core
+langchain-google-genai
+langchain-openai
+langchain-text-splitters
+
+# ══════════════════════════════════════════════════════════
+# 3차 requirements.txt 에서 제거된 것들
+#   fastapi, uvicorn, python-multipart  → Django 가 대체
+#   sqlalchemy, pymysql                 → Django ORM + mysqlclient
+#   pydantic, pydantic-settings         → Django settings + Form
+#   python-jose[cryptography]           → Django 세션 인증
+#   passlib[bcrypt], bcrypt<4.1         → Django PBKDF2 해싱
+#   langchain-protocol, langsmith       → 미사용
+# ══════════════════════════════════════════════════════════

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}프로필 - Ecobot{% endblock %}
+{% block content %}
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">{{ user.display_name|first|upper }}</div>
+      <h1>{{ user.display_name }}</h1>
+      <p class="login-subtitle">{{ user.email }}</p>
+    </div>
+    <div class="profile-rows">
+      <div class="profile-row"><span>아이디</span><span>{{ user.username }}</span></div>
+      <div class="profile-row"><span>거주 지역</span><span>{{ user.get_region_display }}</span></div>
+      <div class="profile-row"><span>전화번호</span><span>{{ user.phone|default:"-" }}</span></div>
+      <div class="profile-row"><span>가입일</span><span>{{ user.date_joined|date:"Y.m.d" }}</span></div>
+    </div>
+    <a class="btn btn-primary btn-full" href="{% url 'members:profile_edit' %}">프로필 수정</a>
+    <div class="login-divider"><span></span></div>
+    <a class="btn btn-outline btn-full" href="{% url 'chat:room' %}">챗봇으로 돌아가기</a>
+    <p class="login-link"><a href="{% url 'members:withdraw' %}">회원 탈퇴</a></p>
+  </div>
+</div>
+{% endblock %}
