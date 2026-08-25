@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}단지 규정 등록 - Ecobot{% endblock %}
+{% block content %}
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-logo"><div class="logo-icon">📋</div><h1>{{ apartment.name }} 규정 등록</h1>
+      <p class="login-subtitle">등록하면 즉시 챗봇 답변 근거로 반영됩니다</p></div>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_category">분류</label>
+        <select name="category" id="id_category" class="region-dropdown" required>
+          {% for code, label in form.fields.category.choices %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="id_content">규정 내용</label>
+        <textarea name="content" id="id_content" rows="4" required>{{ form.content.value|default:'' }}</textarea>
+        {% for e in form.content.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_photo">배출장소 사진(선택)</label>
+        <input type="file" name="photo" id="id_photo">
+      </div>
+      <div class="form-group">
+        <label for="id_effective_from">적용 시작일(선택)</label>
+        <input type="date" name="effective_from" id="id_effective_from">
+      </div>
+      <div class="form-group">
+        <label for="id_effective_until">적용 종료일(선택)</label>
+        <input type="date" name="effective_until" id="id_effective_until">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">등록</button>
+    </form>
+    <p class="login-link"><a href="{% url 'apartments:rule_list' %}">← 목록으로</a></p>
+  </div>
+</div>
+{% endblock %}

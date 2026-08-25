@@ -67,6 +67,9 @@ class SourceType(models.TextChoices):
     LAW = "law", "법령 원문"
     GUIDE = "guide", "배출 가이드"
     MANUAL = "manual", "사용자 업로드"
+    # 4차 2R 추가분: 아파트 단지 규정. apartments.ApartmentRule 이 승인되면
+    # apartments/services.py:sync_rule_to_document() 가 이 타입으로 만든다.
+    APARTMENT = "apartment", "아파트 단지 규정"
 
 
 class Document(models.Model):
@@ -80,6 +83,18 @@ class Document(models.Model):
         related_name="documents",
         verbose_name="소유자",
         help_text="사용자가 올린 문서만 채워집니다. 공용 문서는 비어 있습니다.",
+    )
+    # 4차 2R 추가분: 단지 규정 문서만 채워진다. apartments 앱이 rag 를
+    # 참조하지 않고 rag 가 apartments 를 참조하는 방향으로만 의존성을
+    # 두기 위해 문자열 참조("apartments.Apartment")를 쓴다.
+    apartment = models.ForeignKey(
+        "apartments.Apartment",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="단지",
+        help_text="source_type=apartment 문서만 채워집니다.",
     )
     title = models.CharField("제목", max_length=255)
     # Django 의 TextField 는 MySQL 백엔드에서 LONGTEXT 로 생성됩니다.
@@ -124,6 +139,31 @@ class Document(models.Model):
         default="",
         db_index=True,
     )
+
+    # ── 4차 추가분: 시행법 여부 판정 (source_type=law 문서만 채워짐) ──
+    # rag/law_text.py 의 parse_law_header() 가 원문 헤더에서 뽑아
+    # seed_docs.py 가 채웁니다. 가이드·사용자 업로드 문서는 항상 빈 값.
+    law_effective_date = models.DateField("시행일", null=True, blank=True)
+    law_doc_number = models.CharField(
+        "법령/고시 번호", max_length=100, blank=True, default=""
+    )
+    law_amendment_type = models.CharField(
+        "개정 구분", max_length=20, blank=True, default=""
+    )
+
+    # 4차 2R 추가분: 색인 게이트 (이음매 ②). 검토를 거치지 않은 데이터가
+    # 근거로 색인되는 것을 막는다. 기존 law/guide/manual 행은 이 필드가
+    # 생기는 즉시 기본값 approved 로 채워지므로 동작이 그대로 유지된다.
+    # 필터는 검색 시점(search())이 아니라 색인 적재 단계(_load_from_db)
+    # 에서만 건다 — _apply_quota() 자리배분과 얽히지 않기 위해서다.
+    class Status(models.TextChoices):
+        DRAFT = "draft", "작성중"
+        APPROVED = "approved", "승인"
+
+    status = models.CharField(
+        "색인 상태", max_length=20, choices=Status.choices, default=Status.APPROVED, db_index=True,
+    )
+
     created_at = models.DateTimeField("등록일", auto_now_add=True)
     updated_at = models.DateTimeField("수정일", auto_now=True)
 
@@ -147,6 +187,19 @@ class Document(models.Model):
         rag/service.py 의 PUBLIC_SOURCE_TYPES 와 같은 기준입니다.
         """
         return self.source_type in (SourceType.LAW, SourceType.GUIDE)
+
+    def is_currently_effective(self) -> bool | None:
+        """이 법령이 오늘 기준으로 이미 시행 중인지.
+
+        law_effective_date 가 없으면(법령이 아니거나 헤더 파싱 실패)
+        판단 불가로 None 을 돌려줍니다 — False 로 단정하면 "아직 시행
+        안 됨"과 "모름"을 구분할 수 없어집니다.
+        """
+        if not self.law_effective_date:
+            return None
+        from django.utils import timezone
+
+        return self.law_effective_date <= timezone.localdate()
 
 
 class QuestionCluster(models.Model):

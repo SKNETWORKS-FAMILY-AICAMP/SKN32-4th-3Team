@@ -13,37 +13,30 @@
     {% endif %}
     <form method="post">
       {% csrf_token %}
-      <!-- 아이디 / 이름 (2열) -->
-      <div class="form-row-2col">
-        <div class="form-group">
-          <label for="id_username">아이디</label>
-          <input type="text" name="username" id="id_username" placeholder="로그인에 사용할 아이디"
-                 value="{{ form.username.value|default:'' }}" required autofocus>
-          {% for e in form.username.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
-        </div>
-        <div class="form-group">
-          <label for="id_display_name">이름</label>
-          <input type="text" name="display_name" id="id_display_name" placeholder="이름을 입력하세요"
-                 value="{{ form.display_name.value|default:'' }}" required>
-          {% for e in form.display_name.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
-        </div>
+      <div class="form-group">
+        <label for="id_username">아이디</label>
+        <input type="text" name="username" id="id_username" placeholder="로그인에 사용할 아이디"
+               value="{{ form.username.value|default:'' }}" required autofocus>
+        {% for e in form.username.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
-      <!-- 닉네임 / 이메일 (2열) -->
-      <div class="form-row-2col">
-        <div class="form-group">
-          <label for="id_nickname">닉네임</label>
-          <input type="text" name="nickname" id="id_nickname" placeholder="커뮤니티에서 사용할 닉네임"
-                 value="{{ form.nickname.value|default:'' }}">
-          {% for e in form.nickname.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
-        </div>
-        <div class="form-group">
-          <label for="id_email">이메일</label>
-          <input type="email" name="email" id="id_email" placeholder="user@email.com"
-                 value="{{ form.email.value|default:'' }}" required>
-          {% for e in form.email.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
-        </div>
+      <div class="form-group">
+        <label for="id_display_name">이름</label>
+        <input type="text" name="display_name" id="id_display_name" placeholder="이름을 입력하세요"
+               value="{{ form.display_name.value|default:'' }}" required>
+        {% for e in form.display_name.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
-      <!-- 거주 지역 (1열) -->
+      <div class="form-group">
+        <label for="id_nickname">닉네임</label>
+        <input type="text" name="nickname" id="id_nickname" placeholder="커뮤니티·챗봇에 표시될 닉네임"
+               value="{{ form.nickname.value|default:'' }}" required>
+        {% for e in form.nickname.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_email">이메일</label>
+        <input type="email" name="email" id="id_email" placeholder="user@email.com"
+               value="{{ form.email.value|default:'' }}" required>
+        {% for e in form.email.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
       <div class="form-group">
         <label for="id_region">거주 지역</label>
         <select name="region" id="id_region" class="region-dropdown">
@@ -52,6 +45,40 @@
           {% endfor %}
         </select>
         {% for e in form.region.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label>가입 유형</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          {% for value, label in form.fields.member_type.choices %}
+            <label style="font-weight:normal;display:flex;align-items:center;gap:6px;white-space:nowrap">
+              <input type="radio" name="member_type" value="{{ value }}"
+                     {% if form.member_type.value|default:"resident" == value %}checked{% endif %}>
+              {{ label }}
+            </label>
+          {% endfor %}
+        </div>
+        {% for e in form.member_type.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_apartment">단지</label>
+        <select name="apartment" id="id_apartment">
+          <option value="">-- 단지를 선택하세요 --</option>
+          {% for apt in apartments %}
+            <option value="{{ apt.pk }}" data-region="{{ apt.region }}"
+                    {% if form.apartment.value|stringformat:"s" == apt.pk|stringformat:"s" %}selected{% endif %}>
+              {{ apt.name }}
+            </option>
+          {% endfor %}
+        </select>
+        <p id="apartment-empty-hint" style="display:none;color:#888;font-size:13px;margin-top:4px">
+          이 지역엔 등록된 단지가 없습니다. 가입 후 나중에 '단지 찾기'에서 신청할 수 있어요.
+        </p>
+        {% for e in form.apartment.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_decision_note">확인 메모 (선택)</label>
+        <textarea name="decision_note" id="id_decision_note" rows="2"
+                  placeholder="동/호수, 위탁관리 계약서 번호 등">{{ form.decision_note.value|default:'' }}</textarea>
       </div>
       <div class="form-group">
         <label for="id_password1">비밀번호</label>
@@ -63,19 +90,43 @@
         <input type="password" name="password2" id="id_password2" placeholder="비밀번호를 다시 입력하세요" required>
         {% for e in form.password2.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
-      <div class="pw-hint-card">
-        <span class="pw-hint-title">비밀번호 조건</span>
-        <div class="pw-hint-grid">
-          <span class="pw-hint-item">✓ 8자 이상</span>
-          <span class="pw-hint-item">✓ 숫자만 불가</span>
-          <span class="pw-hint-item">✓ 개인정보와 다르게</span>
-          <span class="pw-hint-item">✓ 연속된 숫자 불가</span>
-        </div>
-      </div>
       <button type="submit" class="btn btn-primary btn-full">가입하기</button>
     </form>
     <p class="login-link">이미 계정이 있으신가요? <a href="{% url 'members:login' %}">로그인</a></p>
     <p class="login-link"><a href="{% url 'home' %}">← 홈으로 돌아가기</a></p>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var regionSelect = document.getElementById("id_region");
+    var apartmentSelect = document.getElementById("id_apartment");
+    var emptyHint = document.getElementById("apartment-empty-hint");
+    if (!regionSelect || !apartmentSelect) return;
+
+    var options = Array.prototype.slice.call(apartmentSelect.querySelectorAll("option[data-region]"));
+
+    function applyFilter() {
+      var region = regionSelect.value;
+      var visibleCount = 0;
+      var currentValid = false;
+      options.forEach(function (opt) {
+        var match = opt.getAttribute("data-region") === region;
+        opt.hidden = !match;
+        opt.disabled = !match;
+        if (match) {
+          visibleCount += 1;
+          if (opt.selected) currentValid = true;
+        }
+      });
+      if (!currentValid) apartmentSelect.value = "";
+      apartmentSelect.style.display = visibleCount > 0 ? "" : "none";
+      emptyHint.style.display = visibleCount > 0 ? "none" : "";
+    }
+
+    regionSelect.addEventListener("change", applyFilter);
+    applyFilter();
+  })();
+</script>
 {% endblock %}

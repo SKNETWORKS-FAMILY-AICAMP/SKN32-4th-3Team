@@ -92,7 +92,19 @@ class DashboardView(AdminRequiredMixin, View):
     """
 
     def get(self, request):
-        return render(request, "dashboard/index.html")
+        # 4차 2R 추가분: 관리사무소 관리자 승인 대기 건수. 링크 배지 하나만
+        # 추가하고, apartments 앱 자체의 큐 화면은 apartments/views.py 에
+        # 그대로 둔다 — AdminRequiredMixin(is_staff 전역 권한)과 단지
+        # 스코프 권한을 섞지 않기 위해서다.
+        from apartments.models import Membership
+
+        pending_apartment_managers = Membership.objects.filter(
+            role=Membership.Role.MANAGER, status=Membership.Status.REQUESTED,
+        ).count()
+        return render(
+            request, "dashboard/index.html",
+            {"pending_apartment_managers": pending_apartment_managers},
+        )
 
 
 class StatsAPIView(AdminRequiredMixin, View):

@@ -134,3 +134,44 @@ def _join_wrapped_lines(lines: list[str]) -> str:
 def count_articles(text: str) -> int:
     """본문에서 인식된 조문 수. 추출이 제대로 됐는지 확인하는 지표."""
     return len(re.findall(r"제\s*\d+\s*조(?:의\s*\d+)?\s*[(（]", text))
+
+
+# ── 4차 추가분: 시행법 여부 판정 ──────────────────────────────────
+# law.go.kr 원문을 그대로 옮긴 법령 파일은 전부 2번째 줄에
+#   [시행 2026. 3. 26.] [대통령령 제36217호, 2026. 3. 24., 일부개정]
+# 형태의 헤더를 갖고 있다 (data/laws/ 9개 파일 전부 확인 — 법률·대통령령·
+# 환경부고시·부처훈령·부처령 등 문서 종류가 달라도 형식은 동일하다).
+# 이 헤더의 "시행일"이 오늘보다 미래면 아직 시행되지 않은 개정 조문이라는
+# 뜻이라, 챗봇이 이걸 현행법인 것처럼 인용하면 안 된다 (실제로
+# 폐기물관리법.txt 가 이 케이스다). seed_docs.py 가 문서를 적재할 때
+# 이 함수로 뽑은 값을 rag.models.Document 의 law_* 필드에 저장한다.
+LAW_HEADER_RE = re.compile(
+    r"\[시행\s*(?P<ey>\d{4})\.\s*(?P<em>\d{1,2})\.\s*(?P<ed>\d{1,2})\.\]\s*"
+    r"\[(?P<doctype>[^\d\]]+?)\s*제\s*(?P<num>[\w-]+)\s*호,\s*"
+    r"\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.,\s*(?P<amend>[^\]]+)\]"
+)
+
+
+def parse_law_header(text: str) -> dict:
+    """법령 원문 2번째 줄의 "[시행 ...] [문서종류 제N호, ..., 개정유형]"
+
+    헤더를 파싱한다. 매치에 실패하면(법령이 아니거나 형식이 다르면)
+    빈 값을 돌려준다 — count_articles() 가 0일 때 경고만 남기고 계속
+    진행하는 것과 같은 원칙으로, 여기서도 예외를 던져 적재를 막지 않는다.
+
+    반환:
+        {"effective_date": date | None, "doc_number": str, "amendment_type": str}
+    """
+    from datetime import date
+
+    match = LAW_HEADER_RE.search(text)
+    if not match:
+        return {"effective_date": None, "doc_number": "", "amendment_type": ""}
+
+    return {
+        "effective_date": date(
+            int(match["ey"]), int(match["em"]), int(match["ed"])
+        ),
+        "doc_number": f"{match['doctype'].strip()} 제{match['num']}호",
+        "amendment_type": match["amend"].strip(),
+    }

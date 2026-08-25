@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}관리사무소 관리자 명단 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  {% include 'apartments/_nav.html' %}
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head"><h1>관리사무소 관리자 명단</h1></div>
+    <table class="admin-table">
+      <thead><tr><th>단지</th><th>관리자</th><th>승인일</th><th></th></tr></thead>
+      <tbody>
+      {% for m in managers %}
+        <tr>
+          <td>{{ m.apartment }}</td>
+          <td>{{ m.member.nickname|default:m.member.display_name }} ({{ m.member.username }})</td>
+          <td>{{ m.decided_at|date:"Y-m-d"|default:"-" }}</td>
+          <td>
+            <form method="post" action="{% url 'apartments:membership_leave' m.pk %}" style="display:inline"
+                  onsubmit="return confirm('{{ m.member }} 님의 관리자 권한을 박탈할까요?');">
+              {% csrf_token %}<button class="btn btn-outline btn-sm" type="submit">승인 박탈</button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">승인된 관리사무소 관리자가 없습니다.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -65,6 +65,11 @@ INSTALLED_APPS = [
     "chat",
     # 관리자 통계 대시보드
     "dashboard",
+    # 4차 2R 추가분: 아파트 단지 · 3단계 회원 계층(입주민/관리사무소
+    # 관리자/서비스 운영자). rag/chat 이 이 앱의 모델을 문자열 참조로
+    # 가리키므로(apartments.Apartment) migrate 순서상 rag/chat 보다 먼저
+    # 와야 한다.
+    "apartments",
 ]
 
 MIDDLEWARE = [
@@ -187,6 +192,10 @@ RAG_TOP_K_COMMON = _env_int("RAG_TOP_K_COMMON", 1)
 RAG_TOP_K_LAW = _env_int("RAG_TOP_K_LAW", 2)
 # 지역 필터가 없을 때 쓰는 가이드 합계 (하위 호환)
 RAG_TOP_K_GUIDE = _env_int("RAG_TOP_K_GUIDE", 3)
+# 4차 2R 추가분: 단지 규정 전용 자리. 단지 결과가 실제로 있을 때만
+# _apply_quota() 가 이 자리를 배분한다(조건부 슬롯) — 없으면 기존
+# 지역/공통/법령 3분할과 완전히 동일하게 동작해 기존 지표를 보존한다.
+RAG_TOP_K_APARTMENT = _env_int("RAG_TOP_K_APARTMENT", 2)
 
 # 유사도 임계값. 미만이면 근거 없음으로 보고 LLM 을 호출하지 않습니다.
 # ⚠️ 임베딩 백엔드를 바꾸면 rag/management/commands/measure_threshold.py 로
@@ -250,6 +259,13 @@ RAG_PIPELINE = os.getenv("RAG_PIPELINE", "legacy")
 # 질문 클러스터링 임계값. 이 값 이상이면 기존 클러스터에 편입합니다.
 # (3차 routers/rag.py 의 SIMILARITY_THRESHOLD 상수를 설정으로 승격)
 QUESTION_CLUSTER_THRESHOLD = _env_float("QUESTION_CLUSTER_THRESHOLD", 0.85)
+
+# 4차 추가분: 검색 실패 시 "유사 질문 추천"용 임계값. 위 병합 임계값(0.85)
+# 보다 낮게 잡아, 완전히 같진 않아도 비슷한 과거 질문까지 후보로 잡는다.
+QUESTION_SUGGEST_THRESHOLD = _env_float("QUESTION_SUGGEST_THRESHOLD", 0.55)
+QUESTION_SUGGEST_LIMIT = _env_int("QUESTION_SUGGEST_LIMIT", 3)
+# 이 이상이면 "추천할 필요 없는, 사실상 같은 질문"으로 보고 제외한다.
+QUESTION_SUGGEST_DEDUP_THRESHOLD = _env_float("QUESTION_SUGGEST_DEDUP_THRESHOLD", 0.92)
 
 # 답변 생성 시 프롬프트에 넣을 최근 대화 턴 수
 CHAT_HISTORY_TURNS = _env_int("CHAT_HISTORY_TURNS", 3)

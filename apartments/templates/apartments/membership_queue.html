@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}관리자 승인 큐 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  {% include 'apartments/_nav.html' %}
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head"><h1>관리사무소 관리자 승인 대기</h1></div>
+    <table class="admin-table">
+      <thead><tr><th>신청자</th><th>단지</th><th>근거</th><th>신청일</th><th></th></tr></thead>
+      <tbody>
+      {% for m in pending %}
+        <tr>
+          <td>{{ m.member.display_name }} ({{ m.member.username }})</td>
+          <td>{{ m.apartment }}</td>
+          <td>{{ m.decision_note|default:"-" }}</td>
+          <td>{{ m.applied_at|date:"Y-m-d" }}</td>
+          <td>
+            <form method="post" action="{% url 'apartments:membership_decide' m.pk %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="action" value="approve">
+              <button class="btn btn-primary btn-sm" type="submit">승인</button>
+            </form>
+            <form method="post" action="{% url 'apartments:membership_decide' m.pk %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="action" value="reject">
+              <button class="btn btn-outline btn-sm" type="submit">거절</button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">대기 중인 신청이 없습니다.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

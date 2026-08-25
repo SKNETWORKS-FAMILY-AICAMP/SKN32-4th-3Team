@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}단지 규정 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  {% include 'apartments/_nav.html' %}
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head">
+      <h1>{{ apartment.name }} 규정</h1>
+      {% if can_upload_rule %}
+        <a class="btn btn-primary btn-sm" href="{% url 'apartments:rule_create' %}">+ 규정 등록</a>
+      {% endif %}
+    </div>
+    {% if not can_upload_rule %}
+      <p style="color:#888;font-size:13px">
+        규정 등록은 관리사무소 관리자만 할 수 있습니다. 바꾸고 싶은 규정이 있다면
+        <a href="{% url 'boards:create' %}">커뮤니티에 글을 남겨</a> 관리사무소에 제안해 주세요.
+      </p>
+    {% endif %}
+    <table class="admin-table">
+      <thead><tr><th>분류</th><th>내용</th><th>출처</th><th>상태</th></tr></thead>
+      <tbody>
+      {% for rule in rules %}
+        <tr>
+          <td>{{ rule.get_category_display }}</td>
+          <td>{{ rule.content|truncatechars:60 }}</td>
+          <td>{{ rule.get_source_level_display }}</td>
+          <td>{{ rule.get_status_display }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">등록된 규정이 없습니다.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

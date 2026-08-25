@@ -62,6 +62,8 @@ class ChatRoomView(LoginRequiredMixin, View):
     """
 
     def get(self, request):
+        from apartments import permissions as apt_permissions
+
         return render(
             request,
             "chat/room.html",
@@ -70,6 +72,9 @@ class ChatRoomView(LoginRequiredMixin, View):
                 # 회원 프로필의 거주 지역이 드롭다운 기본값이 됩니다.
                 # (3차는 새로고침하면 서울로 리셋되던 부분)
                 "default_region": request.user.region if request.user.region in _VALID_REGIONS else "seoul",
+                # design 변경(2R-2): 승인된 단지 소속(또는 서비스 운영자)이
+                # 없으면 커뮤니티 진입 버튼 자체를 숨긴다.
+                "can_access_community": apt_permissions.has_community_access(request),
             },
         )
 
@@ -99,6 +104,18 @@ class ChatAskView(LoginRequiredMixin, View):
         if region not in _VALID_REGIONS:
             region = "seoul"
 
+        # 4차 2R 추가분: 단지 컨텍스트. 대화방을 새로 만들 때만 고정하고
+        # (기존 대화방은 옛 기준으로 남는다 — 설계 문서 10절), 검색·답변
+        # 생성에는 매 질문마다 최신 값을 넘긴다(단지를 옮긴 뒤 새로 하는
+        # 질문은 새 단지 기준이어야 하므로).
+        # design 변경(2R-2): 챗봇은 승인 여부와 무관하게 신청한 단지의
+        # 규정까지 답변 근거로 쓴다 — 커뮤니티/규정 관리 등 승인이
+        # 진짜로 필요한 화면과 달리, 자기가 신청한 단지 정보를 물어보는
+        # 것 자체는 검증 전이어도 막을 이유가 없다는 판단.
+        from apartments import scope
+
+        apartment_id = scope.current_apartment_id_for_chat(request)
+
         # ── 1. 대화방 확보 ──
         session_id = body.get("session_id")
         if session_id:
@@ -109,7 +126,7 @@ class ChatAskView(LoginRequiredMixin, View):
             if session.region != region:
                 session.region = region
         else:
-            session = ChatSession(owner=request.user, region=region)
+            session = ChatSession(owner=request.user, region=region, apartment_id=apartment_id)
         session.title = session.title or question[:30]
         session.save()
 
@@ -135,6 +152,7 @@ class ChatAskView(LoginRequiredMixin, View):
             owner_id=request.user.pk,
             region=region,
             history=history or None,
+            apartment_id=apartment_id,
         )
 
         # ── 5. 통계 로그 + 클러스터 ──
@@ -144,6 +162,7 @@ class ChatAskView(LoginRequiredMixin, View):
             region=region,
             # 근거를 하나라도 찾았는지. '자료없음 대응률' 지표의 원천.
             has_answer=bool(result.get("sources")),
+            apartment_id=apartment_id,
         )
         cluster = assign_cluster(question)
         if cluster is not None:
@@ -157,6 +176,9 @@ class ChatAskView(LoginRequiredMixin, View):
             content=result.get("answer", ""),
             tip=result.get("tip", "") or "",
             sources=result.get("sources", []) or [],
+            # 4차 추가분: 유사 질문 추천 · 법령 시행 안내
+            suggested_questions=result.get("suggested_questions", []) or [],
+            law_notice=result.get("law_notice", "") or "",
         )
         session.save(update_fields=["updated_at"])  # 목록 정렬 갱신
 
@@ -167,6 +189,8 @@ class ChatAskView(LoginRequiredMixin, View):
                 "tip": result.get("tip", ""),
                 "source": result.get("source", ""),
                 "sources": result.get("sources", []),
+                "suggested_questions": result.get("suggested_questions", []),
+                "law_notice": result.get("law_notice", ""),
             }
         )
 
@@ -181,9 +205,9 @@ class ChatSessionListView(LoginRequiredMixin, View):
     """
 
     def get(self, request):
-        sessions = ChatSession.objects.filter(owner=request.user).prefetch_related(
-            "messages"
-        )
+        sessions = ChatSession.objects.filter(owner=request.user).select_related(
+            "apartment"
+        ).prefetch_related("messages")
 
         payload = []
         for s in sessions:
@@ -191,6 +215,10 @@ class ChatSessionListView(LoginRequiredMixin, View):
                 {
                     "session_id": str(s.pk),
                     "region": s.region,
+                    # 4차 2R 추가분: 이 대화방이 고정한 단지 컨텍스트.
+                    # 프로필/단지를 바꾼 뒤에도 옛 대화방은 이 값으로 남는다
+                    # (설계 문서 10절) — 프론트가 배지로 보여줘 혼란을 줄인다.
+                    "apartment": s.apartment.name if s.apartment_id else None,
                     "messages": [
                         {
                             "role": m.role,
@@ -205,6 +233,9 @@ class ChatSessionListView(LoginRequiredMixin, View):
                                     x.get("title", "") for x in (m.sources or [])
                                 )
                             ),
+                            # 4차 추가분: 새로고침 후 복원에도 같이 실어 보낸다.
+                            "suggested_questions": m.suggested_questions,
+                            "law_notice": m.law_notice,
                             "created_at": m.created_at.isoformat(),
                         }
                         for m in s.messages.all()

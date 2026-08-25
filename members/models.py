@@ -35,6 +35,22 @@ REGION_CHOICES = [
 ]
 
 
+REGION_FILENAME_KEYWORDS = {
+    "서울": "seoul",
+    "천안": "cheonan",
+    "부산 남구": "busan_namgu",
+    "부산남구": "busan_namgu",
+    "부산": "busan_namgu",
+    "세종": "sejong",
+    "인천 미추홀구": "incheon_michuhol",
+    "인천미추홀구": "incheon_michuhol",
+    "미추홀": "incheon_michuhol",
+    "제주": "jeju",
+    "공통": "common",
+    "환경부": "common",
+}
+
+
 class Member(AbstractUser):
     """서비스 회원. AUTH_USER_MODEL 로 지정됩니다."""
 
@@ -43,7 +59,7 @@ class Member(AbstractUser):
 
     username = models.CharField("회원 아이디", max_length=50, unique=True)
     display_name = models.CharField("회원 이름", max_length=30)
-    nickname = models.CharField("닉네임", max_length=30, blank=True, default="",
+    nickname = models.CharField("닉네임", max_length=30, default="",
                                 help_text="커뮤니티·챗봇에서 표시되는 이름입니다.")
     email = models.EmailField("이메일", unique=True)
     gender = models.CharField("성별", max_length=1, choices=GENDER_CHOICES, default="N")

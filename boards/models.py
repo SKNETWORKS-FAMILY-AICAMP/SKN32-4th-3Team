@@ -29,13 +29,29 @@ CATEGORY_CHOICES = [
 
 
 class Board(models.Model):
-    """커뮤니티 게시글 1건."""
+    """커뮤니티 게시글 1건.
+
+    design 변경(2R-3): 커뮤니티는 무조건 단지(apartment) 단위로 쪼갠다 —
+    글쓴이가 소속된 단지 커뮤니티에서만 보이고, 그 단지 소속 회원끼리만
+    읽을 수 있다(boards/views.py:CommunityAccessRequiredMixin·
+    BoardObjectAccessMixin). apartment 를 null 허용으로 두는 이유는 이
+    필드가 생기기 전에 만들어졌을 수 있는 글을 마이그레이션에서 억지로
+    지우거나 단지를 배정하지 않기 위해서다 — 실제 노출 범위는 뷰의
+    필터가 결정한다.
+    """
 
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="boards",
         verbose_name="작성자",
+    )
+    apartment = models.ForeignKey(
+        "apartments.Apartment",
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="boards",
+        verbose_name="단지",
     )
     title = models.CharField("제목", max_length=200)
     content = models.TextField("내용")
