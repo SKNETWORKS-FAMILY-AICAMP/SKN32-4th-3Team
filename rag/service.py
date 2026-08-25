@@ -41,7 +41,15 @@ from django.conf import settings
 from . import chunking, embeddings, vector_store
 
 # 소유자와 무관하게 전체 공개되는 문서 유형 (수집한 공공자료)
-PUBLIC_SOURCE_TYPES = ("law", "guide")
+# 버그 수정(2R-2): "apartment" 가 빠져 있어서 owner_id 필터가 단지 규정을
+# 전부 걸러내고 있었다 — 단지 규정 Document 는 owner=None 으로 만들어지는데
+# (apartments/services.py:sync_rule_to_document), owner_id 필터는
+# r["owner_id"] == owner_id (로그인한 실제 사용자 pk) 인지만 보고 그 외엔
+# PUBLIC_SOURCE_TYPES 인지로 판정한다. law/guide 처럼 사람을 안 가리는
+# 문서라 여기 넣어야 맞다 — 실제 노출 범위는 owner_id 가 아니라 뒤에 있는
+# apartment_id fail-closed 필터와 Document.status=approved 색인 게이트가
+# 담당한다.
+PUBLIC_SOURCE_TYPES = ("law", "guide", "apartment")
 
 # 프론트에 돌려줄 근거 미리보기 길이
 SNIPPET_LENGTH = 140
@@ -182,6 +190,7 @@ def search(
     min_score: float | None = None,
     region: str | None = None,
     balanced: bool = False,
+    apartment_id: int | None = None,
 ) -> list[dict]:
     """질문과 유사한 청크를 점수 순으로 반환한다.
 
@@ -224,13 +233,93 @@ def search(
             if r.get("region") in (region, "common", None)
         ]
 
+    # 4차 2R 추가분: 단지 규정 격리(fail-closed). region 필터는 None을
+    # 관용적으로 통과시키지만(공통 문서 보존), apartment는 그러면 안 된다 —
+    # 옛 인덱스에 남은 단지 규정이 전 사용자에게 새는 사고로 이어진다.
+    # apartment_id가 None(단지 미가입 사용자)이면 apartment 청크를 전부 제거한다.
+    results = [
+        r for r in results
+        if r.get("source_type") != "apartment" or r.get("apartment_id") == apartment_id
+    ]
+
     # 유사도 임계값 (환각 방지 1차 장치)
     results = [r for r in results if r.get("score", 0.0) >= min_score]
+
+    # 4차 추가분: 법령 문서에 시행일 정보를 붙인다 (점수/정렬에는 영향 없음).
+    results = _annotate_law_status(results)
+    # 4차 2R 추가분: 단지 규정에 출처 등급·확인수·등록시점을 붙인다.
+    results = _annotate_apartment_meta(results)
 
     if balanced:
         return _apply_quota(results, region)
 
     return results[:top_k]
+
+
+def _annotate_law_status(results: list[dict]) -> list[dict]:
+    """법령 결과에 시행일 정보를 붙인다.
+
+    chunks.json/FAISS 는 건드리지 않고 document_id 로 DB만 한 번 더
+    조회한다 (재색인 없이 붙이려고 일부러 이렇게 골랐다). law 가 아닌
+    항목이나 시행일 파싱에 실패한 법령은 그대로 통과한다(=판단 불가).
+    """
+    law_ids = {
+        r["document_id"] for r in results
+        if r.get("source_type") == "law" and r.get("document_id") is not None
+    }
+    if not law_ids:
+        return results
+
+    from django.utils import timezone
+
+    from .models import Document
+
+    rows = Document.objects.filter(pk__in=law_ids).values(
+        "id", "law_effective_date", "law_doc_number"
+    )
+    by_id = {row["id"]: row for row in rows}
+    today = timezone.localdate()
+
+    for r in results:
+        row = by_id.get(r.get("document_id"))
+        if not row or not row["law_effective_date"]:
+            continue
+        r["law_effective_date"] = row["law_effective_date"].isoformat()
+        r["law_doc_number"] = row["law_doc_number"]
+        r["law_is_current"] = row["law_effective_date"] <= today
+
+    return results
+
+
+def _annotate_apartment_meta(results: list[dict]) -> list[dict]:
+    """단지 규정 결과에 출처 등급·확인수·등록시점을 붙인다.
+
+    _annotate_law_status() 와 같은 이유로 chunks.json/FAISS 는 건드리지
+    않고 document_id 로 ApartmentRule을 한 번 더 조회한다. rag 가
+    apartments 를 참조하는 방향이라 apartments 는 rag 를 몰라도 된다.
+    """
+    apt_doc_ids = {
+        r["document_id"] for r in results
+        if r.get("source_type") == "apartment" and r.get("document_id") is not None
+    }
+    if not apt_doc_ids:
+        return results
+
+    from apartments.models import ApartmentRule
+
+    rows = ApartmentRule.objects.filter(document_id__in=apt_doc_ids).values(
+        "document_id", "source_level", "created_at"
+    )
+    by_doc = {row["document_id"]: row for row in rows}
+
+    for r in results:
+        row = by_doc.get(r.get("document_id"))
+        if not row:
+            continue
+        r["source_level"] = row["source_level"]
+        r["registered_at"] = row["created_at"].date().isoformat()
+
+    return results
 
 
 def _apply_quota(results: list[dict], region: str | None = None) -> list[dict]:
@@ -254,7 +343,14 @@ def _apply_quota(results: list[dict], region: str | None = None) -> list[dict]:
         return results
 
     laws = [r for r in results if r.get("source_type") == "law"]
-    guides = [r for r in results if r.get("source_type") != "law"]
+    apartments = [r for r in results if r.get("source_type") == "apartment"]
+    guides = [r for r in results if r.get("source_type") not in ("law", "apartment")]
+
+    # 4차 2R 추가분: 단지 규정 자리는 "실제로 결과가 있을 때만" 배분한다.
+    # 없으면 apartment_quota=0 이라 아래 계산이 기존 3분할과 완전히 같다 —
+    # 4번째 그룹을 고정으로 넣으면 기존 지표(통과율 93.3%)가 무효가 된다는
+    # 설계 문서의 지적을 그대로 지킨다.
+    apartment_quota = settings.RAG_TOP_K_APARTMENT if apartments else 0
 
     if region:
         region_quota = settings.RAG_TOP_K_REGION
@@ -264,12 +360,17 @@ def _apply_quota(results: list[dict], region: str | None = None) -> list[dict]:
         local = [r for r in guides if r.get("region") == region]
         common = [r for r in guides if r.get("region") != region]
 
-        picked = local[:region_quota] + common[:common_quota] + laws[:law_quota]
-        total = region_quota + common_quota + law_quota
+        picked = (
+            apartments[:apartment_quota]
+            + local[:region_quota]
+            + common[:common_quota]
+            + laws[:law_quota]
+        )
+        total = apartment_quota + region_quota + common_quota + law_quota
     else:
         guide_quota = settings.RAG_TOP_K_GUIDE
-        picked = guides[:guide_quota] + laws[:law_quota]
-        total = guide_quota + law_quota
+        picked = apartments[:apartment_quota] + guides[:guide_quota] + laws[:law_quota]
+        total = apartment_quota + guide_quota + law_quota
 
     # 남은 자리를 다른 그룹에서 채운다
     if len(picked) < total:
@@ -286,6 +387,7 @@ def ask(
     owner_id: int | None = None,
     region: str | None = None,
     history: list[dict] | None = None,
+    apartment_id: int | None = None,
 ) -> dict:
     """검색된 문맥을 근거로 답변을 생성한다.
 
@@ -299,21 +401,43 @@ def ask(
 
     근거가 없으면 LLM 을 호출하지 않는다 (환각 방지 1차 장치).
     자료없음 대응률 100% 가 이 분기 덕분이므로 반드시 유지할 것.
+
+    4차 추가분: 아직 시행되지 않은 법령(law_is_current=False)은 답변
+    근거(그라운딩)에서 제외한다. LLM 이 미래 시행 조문을 현재 규정인
+    것처럼 인용하면 안 되기 때문이다 — search() 는 관리자 진단 검색
+    등에서 계속 전체를 보여줘야 하므로, 이 걸러내기는 여기 ask() 에서만
+    한다. 제외된 법령은 버리지 않고 _law_notice() 로 "곧 이렇게
+    바뀝니다" 안내에 쓴다. 오늘 날짜가 지나 그 법이 실제로 시행되면
+    is_currently_effective() 가 바로 True 를 돌려주므로(값을 저장해두지
+    않고 매번 오늘 날짜와 비교), 다음 질문부터는 자동으로 근거에
+    포함된다 — 별도 배치 작업이 필요 없다.
     """
-    results = search(question, top_k, owner_id, region=region, balanced=True)
+    results = search(question, top_k, owner_id, region=region, balanced=True, apartment_id=apartment_id)
+
+    grounding = [r for r in results if r.get("law_is_current") is not False]
+    law_notice = _law_notice(results)
 
     # 근거가 없으면 LLM을 호출하지 않는다. (환각 방지)
-    if not results:
+    if not grounding:
         return {
-            "answer": "관련 문서를 찾을 수 없습니다. 질문을 조금 더 구체적으로 바꿔 보세요.",
+            "answer": (
+                "관련 법령이 아직 시행되지 않아 현재 적용되는 근거를 찾을 수 없습니다."
+                if law_notice else
+                "관련 문서를 찾을 수 없습니다. 질문을 조금 더 구체적으로 바꿔 보세요."
+            ),
             "tip": "",
             "source": "",
             "sources": [],
             "contexts": [],
+            # 4차 추가분: 검색 실패 시 과거의 비슷한 질문을 추천한다.
+            # (아직 시행 전 법령을 찾은 경우엔 엉뚱한 과거 질문보다
+            #  law_notice 가 더 유용한 정보라 추천은 건너뛴다.)
+            "suggested_questions": [] if law_notice else suggest_similar_questions(question),
+            "law_notice": law_notice,
         }
 
-    sections = _generate_answer(question, _build_context(results), history)
-    source_list = _build_sources(results)
+    sections = _generate_answer(question, _build_context(grounding), history)
+    source_list = _build_sources(grounding)
 
     return {
         "answer": sections.get("answer", "") or sections.get("guide", ""),
@@ -323,8 +447,90 @@ def ask(
         "sources": source_list,
         # RAGAS 평가용 원문 청크.
         # chat 뷰의 응답 조립이 걸러내므로 프론트 응답에는 포함되지 않는다.
-        "contexts": [r["content"] for r in results],
+        "contexts": [r["content"] for r in grounding],
+        # 4차 추가분: 근거 중 아직 시행 전인 법령이 있으면 안내 문구.
+        "law_notice": law_notice,
+        "suggested_questions": [],
     }
+
+
+def suggest_similar_questions(question: str, limit: int | None = None) -> list[dict]:
+    """검색 실패한 질문과 비슷하면서, 실제로 답을 찾은 적 있는 과거
+    질문을 추천한다.
+
+    chat/services.py 의 assign_cluster() 와 같은 임베딩→L2정규화→
+    코사인유사도 방식을 쓰되, "임계값 이상 중 최고 1개에 편입"이 아니라
+    "QUESTION_SUGGEST_THRESHOLD(병합 임계값보다 낮음) 이상을 유사도
+    순으로 최대 limit개" 를 돌려준다. assign_cluster() 자체는 이미
+    검증된 동작이라 손대지 않고 같은 계산을 여기 새로 둔다.
+
+    실사용 중 확인된 문제 2건을 여기서 걸러낸다.
+        1) 성공 이력이 없는 클러스터는 후보에서 제외한다. 안 그러면
+           "방금 실패한 질문과 비슷한, 역시 계속 실패해온 질문"을
+           추천하게 되어 도움이 안 된다 (QuestionCluster 자체에는
+           성패 정보가 없어 chat.ChatLog.has_answer 를 역참조로 조회한다
+           — rag 가 chat 스키마를 알아야 하는 결합이 생기지만, "성공한
+           적 있는 질문만" 이라는 조건을 만족하려면 불가피하다).
+        2) 지금 질문과 사실상 같은 문장(유사도가 매우 높은 클러스터)은
+           제외한다. 같은 질문을 반복하면 assign_cluster() 가 기존
+           클러스터에 병합하므로, 그 클러스터가 방금 실패한 "이 질문
+           자체"를 스스로 추천하는 순환이 생길 수 있다 — 실제로
+           재현된 문제다.
+    """
+    import json
+
+    import numpy as np
+
+    from .models import QuestionCluster
+
+    limit = limit or settings.QUESTION_SUGGEST_LIMIT
+
+    try:
+        vec = embeddings.embed_documents([question])[0]
+    except Exception:
+        return []
+
+    arr = np.asarray(vec, dtype=np.float32)
+    norm = float(np.linalg.norm(arr))
+    if norm > 0:
+        arr = arr / norm
+
+    candidates = QuestionCluster.objects.filter(logs__has_answer=True).distinct()
+
+    scored = []
+    for cluster in candidates:
+        c_vec = np.asarray(json.loads(cluster.embedding), dtype=np.float32)
+        sim = float(np.dot(arr, c_vec))
+        if sim >= settings.QUESTION_SUGGEST_DEDUP_THRESHOLD:
+            continue  # 사실상 같은 질문 — 추천할 필요 없음
+        if sim >= settings.QUESTION_SUGGEST_THRESHOLD:
+            scored.append((sim, cluster))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [
+        {"question": c.representative, "count": c.count}
+        for _, c in scored[:limit]
+    ]
+
+
+def _law_notice(results: list[dict]) -> str:
+    """근거 중 아직 시행 전인 법령이 있으면 안내 문구를 만든다.
+
+    _annotate_law_status() 가 search() 안에서 이미 law_is_current 를
+    붙여 놓은 상태라고 가정한다.
+    """
+    upcoming = [
+        r for r in results
+        if r.get("source_type") == "law" and r.get("law_is_current") is False
+    ]
+    if not upcoming:
+        return ""
+
+    labels = dict.fromkeys(
+        f"{_clean_title(r.get('title', ''))}({r.get('law_effective_date')} 시행 예정)"
+        for r in upcoming
+    )
+    return "⚠ 다음 법령은 아직 시행 전입니다 — 현재는 개정 전 조문이 적용됩니다: " + ", ".join(labels)
 
 
 # ─────────────────── 컨텍스트·출처 조립 ───────────────────
@@ -344,14 +550,27 @@ def _build_context(results: list[dict]) -> str:
         [자원순환기본법 제15조]
         ...본문...
     """
+    apartments: list[str] = []
     guides: list[str] = []
     laws: list[str] = []
 
     for item in results:
         block = f"[{item.get('title', '제목 없음')}]\n{item['content']}"
-        (laws if item.get("source_type") == "law" else guides).append(block)
+        source_type = item.get("source_type")
+        if source_type == "apartment":
+            apartments.append(block)
+        elif source_type == "law":
+            laws.append(block)
+        else:
+            guides.append(block)
 
+    # 4차 2R 추가분: 단지 규정을 맨 앞에 둔다. 단지 규정이 지자체 안내와
+    # 어긋나는 경우가 흔하므로(예: 구청은 매일 배출, 단지는 수요일만),
+    # llm.py 프롬프트 규칙과 짝을 맞춰 "우리 단지 규정 → 지자체·법령"
+    # 우선순위를 컨텍스트 배치 순서로도 드러낸다.
     parts: list[str] = []
+    if apartments:
+        parts.append("### 우리 단지 규정\n" + "\n\n".join(apartments))
     if guides:
         parts.append("### 배출 가이드\n" + "\n\n".join(guides))
     if laws:
@@ -398,13 +617,19 @@ def _build_sources(results: list[dict]) -> list[dict]:
         if len(snippet) > SNIPPET_LENGTH:
             snippet = snippet[:SNIPPET_LENGTH] + "…"
 
-        sources.append(
-            {
-                "document_id": item.get("document_id"),
-                "title": _clean_title(item.get("title", "제목 없음")),
-                "snippet": snippet,
-            }
-        )
+        source = {
+            "document_id": item.get("document_id"),
+            "title": _clean_title(item.get("title", "제목 없음")),
+            "snippet": snippet,
+        }
+        # 4차 2R 추가분: 관리사무소 규약과 이웃 제보가 같은 형태로 나오면
+        # 신뢰도를 구분할 수 없다는 설계 문서의 지적 — 등급·확인수·등록
+        # 시점을 함께 노출한다. _annotate_apartment_meta() 가 이미 붙여둔
+        # 값이 있을 때만 채운다 (법령/가이드 문서는 키 자체가 없다).
+        if item.get("source_type") == "apartment":
+            source["source_level"] = item.get("source_level")
+            source["registered_at"] = item.get("registered_at")
+        sources.append(source)
 
     return sources
 
@@ -449,7 +674,9 @@ def _load_from_db(only_manual: bool = False) -> list[dict]:
     """
     from .models import Document, SourceType
 
-    queryset = Document.objects.all()
+    # 4차 2R 추가분: 색인 게이트. 검토를 안 거친 데이터(단지 규정 draft 등)는
+    # 여기서 걸러야 search()/_apply_quota() 로직에 영향을 안 준다.
+    queryset = Document.objects.filter(status=Document.Status.APPROVED)
     if only_manual:
         queryset = queryset.filter(source_type=SourceType.MANUAL)
 
@@ -472,6 +699,9 @@ def _load_from_db(only_manual: bool = False) -> list[dict]:
                 # region 이 None 이거나 "common" 이면 전국 공통으로 취급된다.
                 # (search() 의 지역 필터가 그렇게 읽는다)
                 "region": row.region,
+                # 4차 2R 추가분: chunking.py 가 이 값을 청크 메타에 그대로
+                # 옮긴다 — search() 의 단지 격리 필터가 이 값을 본다.
+                "apartment_id": row.apartment_id,
             }
         )
 
@@ -491,23 +721,14 @@ def _load_from_db(only_manual: bool = False) -> list[dict]:
 def _extract_region(filename: str) -> str:
     """파일명에서 지역 코드를 추출한다. (RAG_SOURCE=files 전용)
 
-    ⚠️ 3차부터 알려진 불일치: seed 쪽은 전국 공통을 None 으로, 이 함수는
-    "common" 문자열로 표기한다. search() 의 지역 필터가 두 값을 모두
-    공통으로 취급하므로 동작에는 문제가 없지만, 표기 통일은 추후 과제다.
+    키워드 매핑은 members.models.REGION_FILENAME_KEYWORDS 하나로
+    통일했습니다 (예전엔 seed_docs.py 와 각자 다른 내용으로 중복돼
+    있었습니다 — 지역을 늘릴 때 한쪽만 고치면 그 지역이 조용히
+    "전국 공통"으로 잡히는 사고가 날 수 있었습니다).
     """
-    REGION_MAP = {
-        "서울": "seoul",
-        "천안": "cheonan",
-        "부산남구": "busan_namgu",
-        "부산": "busan_namgu",
-        "세종": "sejong",
-        "인천미추홀구": "incheon_michuhol",
-        "미추홀": "incheon_michuhol",
-        "제주": "jeju",
-        "공통": "common",
-        "환경부": "common",
-    }
-    for keyword, code in REGION_MAP.items():
+    from members.models import REGION_FILENAME_KEYWORDS
+
+    for keyword, code in REGION_FILENAME_KEYWORDS.items():
         if keyword in filename:
             return code
     return "common"

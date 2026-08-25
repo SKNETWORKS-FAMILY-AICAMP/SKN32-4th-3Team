@@ -35,6 +35,30 @@ REGION_CHOICES = [
 ]
 
 
+# 파일명/제목에서 지역 코드를 추출할 때 쓰는 키워드 매핑.
+# 예전엔 rag/service.py 의 _extract_region() 과
+# rag/management/commands/seed_docs.py 에 이 매핑이 서로 다른 내용으로
+# 중복돼 있었습니다 (표기 변형이 한쪽에만 있거나 "공통"/"환경부" 처리가
+# 한쪽에만 있는 식). 지역을 늘릴 때 두 곳을 따로 고치다 하나를 빠뜨리면
+# 그 지역만 조용히 "전국 공통"으로 잡히는 사고가 나기 쉬워서, 여기 한
+# 곳으로 합쳤습니다. 새 지역을 추가할 때는 REGION_CHOICES 와 여기
+# 두 군데만 고치면 됩니다 (전체 체크리스트는 HANDOFF.md 참고).
+REGION_FILENAME_KEYWORDS = {
+    "서울": "seoul",
+    "천안": "cheonan",
+    "부산 남구": "busan_namgu",
+    "부산남구": "busan_namgu",
+    "부산": "busan_namgu",
+    "세종": "sejong",
+    "인천 미추홀구": "incheon_michuhol",
+    "인천미추홀구": "incheon_michuhol",
+    "미추홀": "incheon_michuhol",
+    "제주": "jeju",
+    "공통": "common",
+    "환경부": "common",
+}
+
+
 class Member(AbstractUser):
     """서비스 회원. AUTH_USER_MODEL 로 지정됩니다."""
 
@@ -43,6 +67,7 @@ class Member(AbstractUser):
 
     username = models.CharField("회원 아이디", max_length=50, unique=True)
     display_name = models.CharField("회원 이름", max_length=30)
+    nickname = models.CharField("닉네임", max_length=30, default="")
     email = models.EmailField("이메일", unique=True)
     gender = models.CharField("성별", max_length=1, choices=GENDER_CHOICES, default="N")
     age = models.PositiveIntegerField("나이", null=True, blank=True)

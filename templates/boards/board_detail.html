@@ -10,6 +10,8 @@
       <a class="btn btn-outline btn-sm" href="{% url 'boards:list' %}">← 목록</a>
       {% if user.is_authenticated and board.author_id == user.id %}
         <a class="btn btn-outline btn-sm" href="{% url 'boards:update' board.pk %}">수정</a>
+      {% endif %}
+      {% if can_delete %}
         <form method="post" action="{% url 'boards:delete' board.pk %}" style="display:inline"
               onsubmit="return confirm('이 글을 삭제할까요?')">
           {% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">삭제</button>
@@ -23,7 +25,7 @@
       <h1>{{ board.title }}</h1>
     </div>
     <p class="board-meta">
-      {{ board.author.display_name }} · {{ board.get_region_display }} ·
+      {{ display_author }} · {{ board.apartment.name|default:board.get_region_display }} ·
       {{ board.created_at|date:"Y.m.d H:i" }} · 조회 {{ board.read_count }}
       {% if board.updated_at|date:"YmdHi" != board.created_at|date:"YmdHi" %}
         · <em>{{ board.updated_at|date:"Y.m.d H:i" }} 수정됨</em>

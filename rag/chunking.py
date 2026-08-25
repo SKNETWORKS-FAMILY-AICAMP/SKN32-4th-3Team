@@ -231,6 +231,11 @@ def build_chunks(documents: list[dict]) -> list[dict]:
                     "chunk_index": chunk_index,
                     # 법령이면 "제15조", 가이드면 "품목별 분리배출 요령 > 종이류"
                     "label": piece["label"],
+                    # 4차 2R 추가분: source_type=apartment 인 청크만 채워진다.
+                    # rag/service.py:search() 의 단지 격리 필터(fail-closed)가
+                    # 이 값을 본다 — 이 필드가 스키마에 새로 생겼으므로 이번
+                    # 변경은 전체 재색인을 강제한다.
+                    "apartment_id": doc.get("apartment_id"),
                 }
             )
 
@@ -257,6 +262,7 @@ def build_langchain_documents(documents: list[dict]) -> list[Document]:
                 "region": chunk["region"],
                 "chunk_index": chunk["chunk_index"],
                 "label": chunk["label"],
+                "apartment_id": chunk["apartment_id"],
             },
         )
         for chunk in build_chunks(documents)

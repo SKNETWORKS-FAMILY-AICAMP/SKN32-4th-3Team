@@ -28,15 +28,14 @@ class BoardForm(forms.ModelForm):
 
     class Meta:
         model = Board
-        fields = ["title", "region", "content", "attachment"]
+        # design 변경(2R-3): region 은 더 이상 사용자가 고르지 않는다 —
+        # 커뮤니티가 단지 단위로 바뀌면서 글쓴이의 활성 단지(apartment)가
+        # region 을 자동으로 정한다(boards/views.py:BoardCreateView).
+        fields = ["title", "content", "attachment"]
         labels = {
             "title": "제목",
-            "region": "지역",
             "content": "내용",
             "attachment": "첨부파일 (선택)",
-        }
-        help_texts = {
-            "region": "어느 지역 기준의 경험·질문인지 골라 주세요.",
         }
 
     def clean_attachment(self):

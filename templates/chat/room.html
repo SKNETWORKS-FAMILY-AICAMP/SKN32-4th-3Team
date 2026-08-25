@@ -35,9 +35,9 @@
 
     <div class="sidebar-footer">
       <div class="user-info">
-        <div class="user-avatar" id="user-avatar">{{ user.display_name|first|upper }}</div>
+        <div class="user-avatar" id="user-avatar">{{ user.nickname|default:user.display_name|first|upper }}</div>
         <div class="user-details">
-          <span class="user-name" id="user-name">{{ user.display_name }}</span>
+          <span class="user-name" id="user-name">{{ user.nickname|default:user.display_name }}</span>
           <span class="user-email" id="user-email">{{ user.email }}</span>
         </div>
       </div>
@@ -45,7 +45,10 @@
         {% if user.is_service_admin %}
           <a class="btn-text" href="{% url 'dashboard:index' %}" style="text-decoration:none">관리자</a>
         {% endif %}
-        <a class="btn-text" href="{% url 'boards:list' %}" style="text-decoration:none">커뮤니티</a>
+        <a class="btn-text" href="{% url 'apartments:mine' %}" style="text-decoration:none">내 단지</a>
+        {% if can_access_community %}
+          <a class="btn-text" href="{% url 'boards:list' %}" style="text-decoration:none">커뮤니티</a>
+        {% endif %}
         <a class="btn-text" href="{% url 'members:profile' %}" style="text-decoration:none">프로필</a>
         <form method="post" action="{% url 'members:logout' %}" style="display:inline">
           {% csrf_token %}

@@ -11,6 +11,9 @@
       <div class="form-group"><label for="id_display_name">이름</label>
         <input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:'' }}" required>
         {% for e in form.display_name.errors %}<p class="form-error">{{ e }}</p>{% endfor %}</div>
+      <div class="form-group"><label for="id_nickname">닉네임</label>
+        <input type="text" name="nickname" id="id_nickname" value="{{ form.nickname.value|default:'' }}" required>
+        {% for e in form.nickname.errors %}<p class="form-error">{{ e }}</p>{% endfor %}</div>
       <div class="form-group"><label for="id_email">이메일</label>
         <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" required>
         {% for e in form.email.errors %}<p class="form-error">{{ e }}</p>{% endfor %}</div>

@@ -55,6 +55,15 @@ class ChatSession(models.Model):
         default="seoul",
         help_text="이 대화방에서 사용하는 지역. 기본값은 회원 프로필의 region 입니다.",
     )
+    # 4차 2R 추가분: 대화방 생성 시점의 단지 컨텍스트를 고정한다.
+    # apartments.scope.current_apartment_id() 로 구해 생성 시 한 번만 넣고,
+    # 이후 회원이 단지를 바꿔도 이 대화방은 옛 기준으로 남는다 — 프로필을
+    # 바꿨는데 옛 답이 나오는 걸 "왜 그런지 모르게" 만들지 않기 위해,
+    # 대화방 목록 화면에 이 값을 배지로 보여준다(설계 문서 10절).
+    apartment = models.ForeignKey(
+        "apartments.Apartment", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+", verbose_name="단지",
+    )
     created_at = models.DateTimeField("생성일", auto_now_add=True)
     updated_at = models.DateTimeField("마지막 활동", auto_now=True)
 
@@ -95,6 +104,13 @@ class ChatMessage(models.Model):
     # 근거 목록. [{"document_id":.., "title":.., "snippet":..}, ...]
     # JSONField 를 쓰면 3차의 json.dumps/json.loads 왕복이 사라집니다.
     sources = models.JSONField("근거 목록", default=list, blank=True)
+
+    # ── 4차 추가분 ──
+    # 검색 실패 시 추천한 과거 질문. [{"question":.., "count":..}, ...]
+    suggested_questions = models.JSONField("추천 질문", default=list, blank=True)
+    # 근거 법령 중 아직 시행 전인 것이 있을 때의 안내 문구.
+    law_notice = models.TextField("법령 시행 안내", blank=True, default="")
+
     created_at = models.DateTimeField("작성일", auto_now_add=True, db_index=True)
 
     class Meta:
@@ -129,6 +145,12 @@ class ChatLog(models.Model):
         blank=True,
         related_name="logs",
         verbose_name="질문 클러스터",
+    )
+    # 4차 2R 추가분: 단지 축 통계용(관리자 대시보드에서 단지별 질문 추이를
+    # 보고 싶을 때 대비). 단지 미가입 사용자의 질문이면 비어 있다.
+    apartment = models.ForeignKey(
+        "apartments.Apartment", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+", verbose_name="단지",
     )
     created_at = models.DateTimeField("질문 시각", auto_now_add=True, db_index=True)
 

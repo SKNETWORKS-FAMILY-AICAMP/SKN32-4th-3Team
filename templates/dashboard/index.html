@@ -16,6 +16,9 @@
           <button class="admin-tab active" data-tab="stats" onclick="switchAdminTab('stats')">질문 통계</button>
           <button class="admin-tab" data-tab="documents" onclick="switchAdminTab('documents')">문서 관리</button>
         </div>
+        <a class="btn btn-outline btn-sm" href="{% url 'apartments:membership_queue' %}">
+          관리사무소 관리자 승인{% if pending_apartment_managers %} ({{ pending_apartment_managers }}건 대기){% endif %}
+        </a>
       </header>
 
       <!-- 질문 통계 탭 -->

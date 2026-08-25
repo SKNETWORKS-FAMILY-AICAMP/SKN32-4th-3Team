@@ -18,6 +18,7 @@ CBV 를 붙여넣는 자리로 남겨뒀습니다.
 from django.contrib.auth import login, logout
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.shortcuts import redirect, render
 from django.views import View
 
@@ -58,19 +59,53 @@ class GuideView(View):
 
 
 class SignUpView(View):
+    def _apartments_context(self):
+        from apartments.models import Apartment
+
+        # 가입 폼은 비밀번호 재입력을 막기 위해 GET 리로드 없이 지역별로
+        # JS 로만 필터한다 — 그러려면 전체 단지를 한 번에 내려줘야 한다.
+        return {"apartments": Apartment.objects.all()}
+
     def get(self, request):
         if request.user.is_authenticated:
             return redirect("chat:room")
-        return render(request, "members/signup.html", {"form": SignUpForm()})
+        return render(
+            request, "members/signup.html",
+            {"form": SignUpForm(), **self._apartments_context()},
+        )
 
     def post(self, request):
         if request.user.is_authenticated:
             return redirect("chat:room")
         form = SignUpForm(request.POST)
         if not form.is_valid():
-            return render(request, "members/signup.html", {"form": form}, status=400)
-        member = form.save()
+            return render(
+                request, "members/signup.html",
+                {"form": form, **self._apartments_context()}, status=400,
+            )
+
+        from django.contrib import messages
+
+        from apartments.models import Membership
+        from apartments.services import apply_for_membership
+
+        with transaction.atomic():
+            member = form.save()
+            apartment = form.cleaned_data.get("apartment")
+            if apartment:
+                apply_for_membership(
+                    member, apartment, form.cleaned_data["member_type"],
+                    form.cleaned_data.get("decision_note", ""),
+                )
+
         login(request, member)  # 가입 직후 자동 로그인 (강사 자료와 동일)
+        if form.cleaned_data.get("apartment"):
+            role_label = dict(Membership.Role.choices)[form.cleaned_data["member_type"]]
+            messages.success(
+                request,
+                f"가입이 완료됐습니다. '{apartment.name}' {role_label} 신청이 접수되어 승인을 기다리는 중이에요 "
+                "— 승인 전에도 챗봇에서 단지 규정을 바로 물어볼 수 있어요.",
+            )
         return redirect("chat:room")
 
 

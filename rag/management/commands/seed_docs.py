@@ -22,27 +22,13 @@ from __future__ import annotations
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from rag.law_text import count_articles, read_law_file
+from members.models import REGION_FILENAME_KEYWORDS
+from rag.law_text import count_articles, read_law_file, parse_law_header
 from rag.models import Document, SourceType
 
 # 폴더 안내문 등 자료가 아닌 파일은 제외한다 (3차 IGNORED_STEMS 그대로)
 IGNORED_STEMS = {"readme", "read_me", "notes", "메모"}
 SUPPORTED = (".txt", ".md", ".pdf")
-
-# 제목의 "[지역명]" → region 코드 (3차 seed_docs.REGION_MAP 그대로).
-# 여기 없는 지역이나 법령은 None(=전국 공통)으로 남는다.
-REGION_MAP = {
-    "서울": "seoul",
-    "천안": "cheonan",
-    "부산 남구": "busan_namgu",
-    "부산남구": "busan_namgu",
-    "세종": "sejong",
-    "인천 미추홀구": "incheon_michuhol",
-    "인천미추홀구": "incheon_michuhol",
-    "미추홀": "incheon_michuhol",
-    "제주": "jeju",
-}
-
 
 def _extract_title(text: str, fallback: str) -> str:
     """첫 줄이 "[서울시] …" 형태면 제목으로 쓰고, 아니면 파일명을 쓴다."""
@@ -55,7 +41,14 @@ def _extract_title(text: str, fallback: str) -> str:
 
 
 def _extract_region(title: str) -> str | None:
-    for keyword, code in REGION_MAP.items():
+    """제목에서 지역 코드를 추출한다.
+
+    키워드 매핑은 members.models.REGION_FILENAME_KEYWORDS 하나로
+    통일했습니다 (예전엔 rag/service.py 의 _extract_region() 과 각자
+    다른 내용으로 중복돼 있었습니다). 여기 없는 지역이나 법령은
+    None(=전국 공통)으로 남는다.
+    """
+    for keyword, code in REGION_FILENAME_KEYWORDS.items():
         if keyword in title:
             return code
     return None
@@ -99,15 +92,26 @@ class Command(BaseCommand):
                 source_key = f"{source_type}:{path.name}"
                 current_keys.add(source_key)
 
+                law_header = {"effective_date": None, "doc_number": "", "amendment_type": ""}
                 if source_type == SourceType.LAW:
                     articles = count_articles(text)
+                    law_header = parse_law_header(text)
                     if articles == 0:
                         self.stderr.write(
                             f"  [경고] {path.name}: 조문(제N조)을 찾지 못했습니다. "
                             "일반 문자 단위로 분할되어 조문 인용이 어려울 수 있습니다."
                         )
-                    else:
+                    if law_header["effective_date"] is None:
+                        self.stderr.write(
+                            f"  [경고] {path.name}: 시행일 헤더를 인식하지 못했습니다. "
+                            "'시행법인지' 배지가 뜨지 않습니다."
+                        )
                         self.stdout.write(f"  법령  : {title} — 조문 {articles}개, {len(text):,}자")
+                    else:
+                        self.stdout.write(
+                            f"  법령  : {title} — 조문 {articles}개, {len(text):,}자"
+                            f" (시행 {law_header['effective_date']}, {law_header['doc_number']})"
+                        )
                 else:
                     self.stdout.write(f"  가이드: {title} — {len(text):,}자 (지역: {region or '전국 공통'})")
 
@@ -119,6 +123,9 @@ class Command(BaseCommand):
                         "content_text": text,
                         "source_type": source_type,
                         "region": region,
+                        "law_effective_date": law_header["effective_date"],
+                        "law_doc_number": law_header["doc_number"],
+                        "law_amendment_type": law_header["amendment_type"],
                     },
                 )
                 added += created

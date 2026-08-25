@@ -23,6 +23,8 @@ urlpatterns = [
     path("rag/", include("rag.urls")),
     # 관리자 통계
     path("dashboard/", include("dashboard.urls")),
+    # 아파트 단지 검색 · 가입 · 관리자 신청/승인 · 규정 제안/검토
+    path("apartments/", include("apartments.urls")),
 ]
 
 if settings.DEBUG:

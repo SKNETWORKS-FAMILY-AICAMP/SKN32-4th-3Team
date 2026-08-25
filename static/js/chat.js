@@ -72,12 +72,17 @@ async function restoreAllSessions() {
         serverId: g.session_id,
         title,
         region: g.region,
+        // 4차 2R 추가분: 이 대화방이 생성 시점에 고정한 단지. 프로필에서
+        // 단지를 바꿔도 이 대화방은 옛 기준으로 남는다.
+        apartment: g.apartment || null,
         messages: g.messages.map(m => ({
           role: m.role === 'user' ? 'user' : 'bot',
           content: m.content,
           tip: m.tip || '',
           source: m.source || '',
           sources: m.sources || [],
+          suggested_questions: m.suggested_questions || [],
+          law_notice: m.law_notice || '',
         })),
       };
     });
@@ -192,6 +197,29 @@ function renderMessages() {
       ? msg.sources.map(s => s.title).join(', ')
       : '');
     const sourcesHtml = sourceLabel ? `<div class="response-source">출처: ${escapeHtml(sourceLabel)}</div>` : '';
+    // 4차 2R 추가분: 단지 규정 출처는 등급·확인수·등록시점을 함께 보여준다.
+    // 관리사무소 규약(official)과 이웃 제보(resident)가 같은 형태로
+    // 나오면 신뢰도를 구분할 수 없다는 설계 문서 7절의 지적을 반영한다.
+    const apartmentSources = (msg.sources || []).filter(s => s.source_level);
+    const apartmentSourcesHtml = apartmentSources.length
+      ? `<div class="response-apartment-sources">${apartmentSources.map(s => {
+          const levelLabel = s.source_level === 'official' ? '관리사무소·규약' : '입주민 제보';
+          const dateLabel = s.registered_at ? ` · ${escapeHtml(s.registered_at)} 등록` : '';
+          return `<span class="apartment-source-badge">🏢 ${escapeHtml(s.title)} — ${levelLabel}${dateLabel}</span>`;
+        }).join('')}</div>`
+      : '';
+    // 4차 추가분: 법령 시행 안내 · 유사 질문 추천
+    const lawNoticeHtml = msg.law_notice
+      ? `<div class="response-law-notice">${escapeHtml(msg.law_notice)}</div>`
+      : '';
+    const suggestHtml = (msg.suggested_questions && msg.suggested_questions.length)
+      ? `<div class="response-suggestions">
+           <div class="tip-label"><span class="tip-icon">🔎</span> 이런 질문은 어떠세요?</div>
+           <div class="quick-questions">${msg.suggested_questions.map(q =>
+             `<button class="quick-q" onclick="sendQuickQuestion(this.textContent)">${escapeHtml(q.question)}</button>`
+           ).join('')}</div>
+         </div>`
+      : '';
     return `
       <div class="message bot">
         <div class="message-avatar">🌿</div>
@@ -202,6 +230,9 @@ function renderMessages() {
           </div>
           ${tipHtml}
           ${sourcesHtml}
+            ${apartmentSourcesHtml}
+          ${lawNoticeHtml}
+          ${suggestHtml}
         </div>
       </div>`;
   }).join('');
@@ -261,7 +292,7 @@ async function askBackend(question) {
       session_id: session && session.serverId ? session.serverId : null,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();  // {session_id, answer, tip, source, sources}
+    const data = await res.json();  // {session_id, answer, tip, source, sources, suggested_questions, law_notice}
 
     if (session) {
       session.serverId = data.session_id;          // 새 대화면 서버 pk 를 붙인다
@@ -271,6 +302,8 @@ async function askBackend(question) {
         tip: data.tip || '',
         source: data.source || '',
         sources: data.sources || [],
+        suggested_questions: data.suggested_questions || [],
+        law_notice: data.law_notice || '',
       });
     }
   } catch (err) {

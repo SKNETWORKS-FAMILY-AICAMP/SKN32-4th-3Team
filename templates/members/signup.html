@@ -26,6 +26,12 @@
         {% for e in form.display_name.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
       <div class="form-group">
+        <label for="id_nickname">닉네임</label>
+        <input type="text" name="nickname" id="id_nickname" placeholder="커뮤니티·챗봇에 표시될 닉네임"
+               value="{{ form.nickname.value|default:'' }}" required>
+        {% for e in form.nickname.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
         <label for="id_email">이메일</label>
         <input type="email" name="email" id="id_email" placeholder="user@email.com"
                value="{{ form.email.value|default:'' }}" required>
@@ -39,6 +45,40 @@
           {% endfor %}
         </select>
         {% for e in form.region.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label>가입 유형</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          {% for value, label in form.fields.member_type.choices %}
+            <label style="font-weight:normal;display:flex;align-items:center;gap:6px;white-space:nowrap">
+              <input type="radio" name="member_type" value="{{ value }}"
+                     {% if form.member_type.value|default:"resident" == value %}checked{% endif %}>
+              {{ label }}
+            </label>
+          {% endfor %}
+        </div>
+        {% for e in form.member_type.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_apartment">단지</label>
+        <select name="apartment" id="id_apartment">
+          <option value="">-- 단지를 선택하세요 --</option>
+          {% for apt in apartments %}
+            <option value="{{ apt.pk }}" data-region="{{ apt.region }}"
+                    {% if form.apartment.value|stringformat:"s" == apt.pk|stringformat:"s" %}selected{% endif %}>
+              {{ apt.name }}
+            </option>
+          {% endfor %}
+        </select>
+        <p id="apartment-empty-hint" style="display:none;color:#888;font-size:13px;margin-top:4px">
+          이 지역엔 등록된 단지가 없습니다. 가입 후 나중에 '단지 찾기'에서 신청할 수 있어요.
+        </p>
+        {% for e in form.apartment.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_decision_note">확인 메모 (선택)</label>
+        <textarea name="decision_note" id="id_decision_note" rows="2"
+                  placeholder="동/호수, 위탁관리 계약서 번호 등">{{ form.decision_note.value|default:'' }}</textarea>
       </div>
       <div class="form-group">
         <label for="id_password1">비밀번호</label>
@@ -56,4 +96,40 @@
     <p class="login-link"><a href="{% url 'home' %}">← 홈으로 돌아가기</a></p>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  // 지역 -> 단지 계단식 선택. 서버 왕복 없이 이미 렌더링된 옵션을 지역으로만
+  // 필터한다(가입 폼은 비밀번호를 다시 치게 만들 수 없어 GET 리로드 방식을
+  // 쓰지 않는다). 데모 단지가 1~2개뿐이라 전량 렌더링 비용은 무시할 수준.
+  (function () {
+    var regionSelect = document.getElementById("id_region");
+    var apartmentSelect = document.getElementById("id_apartment");
+    var emptyHint = document.getElementById("apartment-empty-hint");
+    if (!regionSelect || !apartmentSelect) return;
+
+    var options = Array.prototype.slice.call(apartmentSelect.querySelectorAll("option[data-region]"));
+
+    function applyFilter() {
+      var region = regionSelect.value;
+      var visibleCount = 0;
+      var currentValid = false;
+      options.forEach(function (opt) {
+        var match = opt.getAttribute("data-region") === region;
+        opt.hidden = !match;
+        opt.disabled = !match;
+        if (match) {
+          visibleCount += 1;
+          if (opt.selected) currentValid = true;
+        }
+      });
+      if (!currentValid) apartmentSelect.value = "";
+      apartmentSelect.style.display = visibleCount > 0 ? "" : "none";
+      emptyHint.style.display = visibleCount > 0 ? "none" : "";
+    }
+
+    regionSelect.addEventListener("change", applyFilter);
+    applyFilter();
+  })();
+</script>
 {% endblock %}
