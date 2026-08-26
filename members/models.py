@@ -32,6 +32,10 @@ REGION_CHOICES = [
     ("incheon_michuhol", "인천 미추홀구"),
     ("sejong", "세종"),
     ("jeju", "제주"),
+    ("daegu", "대구"),
+    ("daejeon", "대전"),
+    ("suwon", "수원"),
+    ("ulsan", "울산"),
 ]
 
 
@@ -46,6 +50,14 @@ REGION_FILENAME_KEYWORDS = {
     "인천미추홀구": "incheon_michuhol",
     "미추홀": "incheon_michuhol",
     "제주": "jeju",
+    "대구": "daegu",
+    "대구시": "daegu",
+    "대전": "daejeon",
+    "대전시": "daejeon",
+    "수원": "suwon",
+    "수원시": "suwon",
+    "울산": "ulsan",
+    "울산시": "ulsan",
     "공통": "common",
     "환경부": "common",
 }

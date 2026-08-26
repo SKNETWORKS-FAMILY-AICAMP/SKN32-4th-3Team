@@ -8,15 +8,23 @@
     </a>
     <div class="land-nav-right">
       <a class="btn btn-outline btn-sm" href="{% url 'chat:room' %}" style="text-decoration:none;">챗봇</a>
-      {% if user.is_authenticated %}
-        <a class="btn btn-primary btn-sm" href="{% url 'boards:create' %}">+ 글쓰기</a>
-      {% else %}
-        <a class="btn btn-primary btn-sm" href="{% url 'members:login' %}?next={% url 'boards:create' %}">로그인하고 글쓰기</a>
+      {% if not notice_only %}
+        {% if user.is_authenticated %}
+          <a class="btn btn-primary btn-sm" href="{% url 'boards:create' %}">+ 글쓰기</a>
+        {% else %}
+          <a class="btn btn-primary btn-sm" href="{% url 'members:login' %}?next={% url 'boards:create' %}">로그인하고 글쓰기</a>
+        {% endif %}
       {% endif %}
     </div>
   </nav>
   <div class="board-wrap">
     {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+
+    {% if notice_only %}
+    <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#795548;">
+      📌 승인 대기 중입니다. 현재 공지글만 열람할 수 있습니다.
+    </div>
+    {% endif %}
 
     <!-- 헤더: 아파트명 + 검색 -->
     <div class="comm-header">
@@ -53,9 +61,28 @@
       </form>
     </div>
 
+    <!-- 공지 배너 -->
+    {% for board in boards %}
+      {% if board.category == 'notice' %}
+      <a href="{% url 'boards:detail' board.pk %}" class="comm-notice-banner">
+        <div class="comm-notice-left">
+          <span class="badge badge-notice">📢 공지</span>
+          {% if board.is_new %}<span class="comm-notice-new">NEW</span>{% endif %}
+          <span class="comm-notice-title">{{ board.title }}</span>
+        </div>
+        <div class="comm-notice-right">
+          <span>{{ board.display_author }}</span>
+          <span>{{ board.created_at|date:"m.d" }}</span>
+          <span>조회 {{ board.read_count }}</span>
+        </div>
+      </a>
+      {% endif %}
+    {% endfor %}
+
     <!-- 2열 카드 그리드 -->
     <div class="comm-cards">
       {% for board in boards %}
+      {% if board.category != 'notice' %}
       <a href="{% url 'boards:detail' board.pk %}" class="comm-card">
         <div class="comm-card-badges">
           {% if board.is_hidden %}<span class="badge badge-hidden">비공개</span>{% endif %}
@@ -82,6 +109,7 @@
           </div>
         </div>
       </a>
+      {% endif %}
       {% empty %}
       <div class="comm-empty">
         {% if kw or category %}조건에 맞는 글이 없습니다.{% else %}아직 글이 없습니다. 첫 글을 남겨 보세요!{% endif %}

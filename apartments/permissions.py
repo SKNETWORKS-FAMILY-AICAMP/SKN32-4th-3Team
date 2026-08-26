@@ -54,6 +54,16 @@ def has_community_access(request) -> bool:
     return scope.current_membership(request) is not None
 
 
+def has_pending_membership(request) -> bool:
+    """신청(REQUESTED) 이상인 멤버십이 있는지. 공지글 열람 허용 판단용."""
+    from . import scope
+
+    user = request.user
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return scope.current_membership_for_chat(request) is not None
+
+
 def can_access_apartment_community(user, apartment_id) -> bool:
     """이 글이 속한 "그 단지" 커뮤니티에 실제로 들어갈 자격이 있는지.
     has_community_access() 는 "승인된 소속이 하나라도 있는가"만 보는

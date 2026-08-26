@@ -21,6 +21,7 @@ from members.models import REGION_CHOICES
 
 
 CATEGORY_CHOICES = [
+    ("notice", "공지"),
     ("question", "질문"),
     ("info", "정보공유"),
     ("review", "후기"),
