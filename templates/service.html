@@ -2,85 +2,169 @@
 {% block title %}서비스 소개 - Ecobot{% endblock %}
 {% block content %}
 <div class="guide-layout">
-      <nav class="land-nav">
-        <a class="land-nav-left" href="{% url 'home' %}" style="cursor:pointer;text-decoration:none;color:inherit">
-          <span class="land-logo-icon">🌿</span>
-          <strong class="land-logo-text">Ecobot</strong>
-        </a>
-        <div class="land-nav-right">
-          <a class="btn btn-outline btn-sm" href="{% url 'home' %}">← 홈으로</a>
-          <a class="btn btn-primary btn-sm" href="{% url 'chat:room' %}">시작하기</a>
-        </div>
-      </nav>
-      <div class="guide-content">
-        <div class="service-hero">
-          <h1>Ecobot 서비스 소개</h1>
-          <p>AI 기반 생활환경 실천 안내 서비스</p>
-        </div>
+  <nav class="land-nav">
+    <a class="land-nav-left" href="{% url 'home' %}" style="cursor:pointer;text-decoration:none;color:inherit">
+      <span class="land-logo-icon">🌿</span>
+      <strong class="land-logo-text">Ecobot</strong>
+    </a>
+    <div class="land-nav-right">
+      <a class="btn btn-outline btn-sm" href="{% url 'home' %}">← 홈으로</a>
+      {% if user.is_authenticated %}
+        <a class="btn btn-primary btn-sm" href="{% url 'chat:room' %}">챗봇 상담</a>
+      {% else %}
+        <a class="btn btn-primary btn-sm" href="{% url 'members:login' %}">로그인</a>
+      {% endif %}
+    </div>
+  </nav>
 
-        <div class="service-section">
-          <h2>Ecobot이란?</h2>
-          <p>Ecobot은 환경부 공식 가이드라인과 지역별 조례를 기반으로, 분리배출·음식물쓰레기·에너지 절약에 대한 정확한 정보를 AI 챗봇으로 제공하는 서비스입니다.</p>
-        </div>
+  <div class="guide-content">
+    <!-- 히어로 -->
+    <div class="svc-hero">
+      <span class="svc-hero-badge">AI 기반 생활환경 실천 안내</span>
+      <h1>우리 동네 환경 실천,<br>Ecobot이 도와드려요</h1>
+      <p>환경부 공식 가이드와 지역별 조례를 기반으로<br>분리배출 · 음식물쓰레기 · 에너지 절약을 정확하게 안내합니다</p>
+    </div>
 
-        <div class="service-features">
-          <div class="service-feat-card">
-            <div class="service-feat-num">01</div>
-            <h3>지역 맞춤 안내</h3>
-            <p>서울, 천안, 부산 남구, 인천 미추홀구, 세종, 제주 등 지역별로 다른 분리배출 기준과 수거 일정을 정확하게 안내합니다.</p>
-          </div>
-          <div class="service-feat-card">
-            <div class="service-feat-num">02</div>
-            <h3>AI 챗봇 상담</h3>
-            <p>궁금한 점을 자연어로 질문하면, RAG 기술을 활용하여 관련 문서에서 근거 기반 답변을 제공합니다.</p>
-          </div>
-          <div class="service-feat-card">
-            <div class="service-feat-num">03</div>
-            <h3>공식 데이터 기반</h3>
-            <p>환경부 재활용품 분리배출 가이드라인, 폐기물관리법 등 공식 자료를 기반으로 신뢰할 수 있는 정보를 제공합니다.</p>
-          </div>
+    <!-- 핵심 기능 -->
+    <div class="svc-section-title">
+      <h2>핵심 기능</h2>
+      <p>Ecobot이 제공하는 주요 서비스입니다</p>
+    </div>
+    <div class="svc-features">
+      <div class="svc-feat-card">
+        <div class="svc-feat-icon" style="background:#E8F5EE">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </div>
-
-        <div class="service-section">
-          <h2>지원 분야</h2>
-          <div class="service-topics">
-            <div class="service-topic">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 5.5l4.876-2.346"/><path d="m14.5 9 3-3-3-3"/></svg>
-              <div>
-                <strong>분리배출 안내</strong>
-                <span>품목별 분리수거 방법, 재활용 가능 여부 판단</span>
-              </div>
-            </div>
-            <div class="service-topic">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4890B" stroke-width="2"><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/></svg>
-              <div>
-                <strong>음식물쓰레기</strong>
-                <span>배출 기준, 감량 방법, 수수료 안내</span>
-              </div>
-            </div>
-            <div class="service-topic">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B7DD8" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-              <div>
-                <strong>에너지 절약</strong>
-                <span>전기·가스 절약 실천법, 지원 제도</span>
-              </div>
-            </div>
-          </div>
+        <h3>AI 챗봇 상담</h3>
+        <p>궁금한 점을 자연어로 질문하면 RAG 기술로 관련 문서에서 근거 기반 답변을 제공합니다. 24시간 언제든 이용 가능합니다.</p>
+      </div>
+      <div class="svc-feat-card">
+        <div class="svc-feat-icon" style="background:#FFF8E1">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4890B" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         </div>
+        <h3>지역 맞춤 안내</h3>
+        <p>서울, 부산, 인천, 대구, 대전, 수원, 세종, 울산, 천안, 제주 등 지역별로 다른 분리배출 기준을 정확하게 안내합니다.</p>
+      </div>
+      <div class="svc-feat-card">
+        <div class="svc-feat-icon" style="background:#E8F0FB">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B7DD8" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <h3>아파트별 맞춤 규정</h3>
+        <p>우리 아파트 관리규약과 배출 규정까지 반영해 단지 사정에 맞는 답변을 드립니다. 관리사무소 연락처도 함께 안내합니다.</p>
+      </div>
+      <div class="svc-feat-card">
+        <div class="svc-feat-icon" style="background:#F3E8FB">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7B2D8B" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>입주민 커뮤니티</h3>
+        <p>같은 아파트 이웃과 배출 경험, 질문, 공지사항을 공유할 수 있습니다. 관리자가 공지를 등록하면 전체 입주민이 확인합니다.</p>
+      </div>
+      <div class="svc-feat-card">
+        <div class="svc-feat-icon" style="background:#FFF0F0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+        </div>
+        <h3>답변 피드백</h3>
+        <p>챗봇 답변에 좋아요/싫어요 피드백을 남기면 관리자가 만족도를 분석하고 서비스 품질을 개선하는 데 활용합니다.</p>
+      </div>
+      <div class="svc-feat-card">
+        <div class="svc-feat-icon" style="background:#E8F5EE">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+        </div>
+        <h3>공식 데이터 기반</h3>
+        <p>환경부 재활용품 분리배출 가이드라인, 폐기물관리법 등 공식 자료를 근거로 신뢰할 수 있는 정보를 제공합니다.</p>
+      </div>
+    </div>
 
-        <div class="service-cta">
-          <h2>지금 바로 시작하세요</h2>
-          <p>회원가입 후 AI 챗봇에게 환경 실천에 관한 질문을 해보세요.</p>
-          <a class="btn btn-primary btn-lg" href="{% url 'chat:room' %}">시작하기</a>
+    <!-- 지원 분야 -->
+    <div class="svc-section-title" style="margin-top:48px;">
+      <h2>지원 분야</h2>
+      <p>Ecobot이 안내하는 환경 실천 영역입니다</p>
+    </div>
+    <div class="svc-topics">
+      <div class="svc-topic-card">
+        <div class="svc-topic-icon" style="background:#E8F5EE">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2D8B4E" stroke-width="2"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 5.5l4.876-2.346"/><path d="m14.5 9 3-3-3-3"/></svg>
+        </div>
+        <div class="svc-topic-body">
+          <h3>분리배출 안내</h3>
+          <p>품목별 분리수거 방법, 재활용 가능 여부 판단, 대형폐기물 배출 방법까지 지역 기준으로 정확하게 안내합니다.</p>
+          <div class="svc-topic-tags">
+            <span>플라스틱</span><span>유리병</span><span>종이류</span><span>비닐류</span><span>캔·고철</span>
+          </div>
         </div>
       </div>
-      <footer class="land-footer">
-        <span>© 2026 Ecobot · 생활환경 실천 안내 서비스</span>
-        <div class="land-footer-links">
-          <a href="#" onclick="event.preventDefault()">이용약관</a>
-          <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
+      <div class="svc-topic-card">
+        <div class="svc-topic-icon" style="background:#FFF8E1">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D4890B" stroke-width="2"><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/></svg>
         </div>
-      </footer>
+        <div class="svc-topic-body">
+          <h3>음식물쓰레기</h3>
+          <p>음식물쓰레기 배출 기준, 감량 방법, 종량제 봉투 및 수수료 안내를 지역별로 제공합니다.</p>
+          <div class="svc-topic-tags">
+            <span>배출 기준</span><span>감량 방법</span><span>수수료</span><span>종량제</span>
+          </div>
+        </div>
+      </div>
+      <div class="svc-topic-card">
+        <div class="svc-topic-icon" style="background:#E8F0FB">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3B7DD8" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div class="svc-topic-body">
+          <h3>에너지 절약</h3>
+          <p>전기·가스 절약 실천법, 에너지 효율 등급, 정부 지원 제도 등을 안내합니다.</p>
+          <div class="svc-topic-tags">
+            <span>전기 절약</span><span>가스 절약</span><span>지원 제도</span><span>효율 등급</span>
+          </div>
+        </div>
+      </div>
     </div>
-  
+
+    <!-- 이용 흐름 -->
+    <div class="svc-section-title" style="margin-top:48px;">
+      <h2>이용 방법</h2>
+      <p>간단한 3단계로 시작하세요</p>
+    </div>
+    <div class="svc-steps">
+      <div class="svc-step">
+        <div class="svc-step-num">1</div>
+        <h3>회원가입 & 지역 설정</h3>
+        <p>가입 시 거주 지역을 선택하면 해당 지역 기준으로 답변합니다. 아파트를 등록하면 단지 규정까지 반영됩니다.</p>
+      </div>
+      <div class="svc-step-arrow">→</div>
+      <div class="svc-step">
+        <div class="svc-step-num">2</div>
+        <h3>챗봇에 질문하기</h3>
+        <p>"스티로폼 어떻게 버려?" 같이 자연어로 질문하면 관련 문서를 검색해 근거와 함께 답변합니다.</p>
+      </div>
+      <div class="svc-step-arrow">→</div>
+      <div class="svc-step">
+        <div class="svc-step-num">3</div>
+        <h3>실천하기</h3>
+        <p>답변에 포함된 실천 팁과 출처를 확인하고 올바르게 실천하세요. 피드백으로 답변 품질 개선에 참여할 수도 있습니다.</p>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="svc-cta">
+      <h2>지금 바로 시작하세요</h2>
+      <p>AI 챗봇에게 환경 실천에 관한 질문을 해보세요</p>
+      <div class="svc-cta-btns">
+        {% if user.is_authenticated %}
+          <a class="btn btn-primary btn-lg" href="{% url 'chat:room' %}">💬 챗봇으로 질문하기</a>
+        {% else %}
+          <a class="btn btn-primary btn-lg" href="{% url 'members:signup' %}">회원가입하고 시작하기</a>
+          <a class="btn btn-outline btn-lg" href="{% url 'members:login' %}">로그인</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <footer class="land-footer">
+    <span>© 2026 Ecobot · 생활환경 실천 안내 서비스</span>
+    <div class="land-footer-links">
+      <a href="#" onclick="event.preventDefault()">이용약관</a>
+      <a href="#" onclick="event.preventDefault()">개인정보처리방침</a>
+    </div>
+  </footer>
+</div>
 {% endblock %}

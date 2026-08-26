@@ -23,6 +23,13 @@
         <span>{{ apartment_name }}</span>
       </div>
     </div>
+    {% elif user_region_display %}
+    <div class="sb-apt-section">
+      <div class="sb-apt-badge">
+        <span class="sb-apt-icon">📍</span>
+        <span>{{ user_region_display }}</span>
+      </div>
+    </div>
     {% endif %}
 
     <div class="sidebar-section" style="padding-bottom:0;">
