@@ -600,12 +600,60 @@ body {
 .chat-source-item { color: var(--color-text-muted); }
 .chat-source-sep { color: var(--color-text-muted); font-size: 11px; }
 
-/* 법령 (muted 한 줄) */
-.chat-law-text {
-  margin-top: 4px;
+/* 시행 예정 법령 안내 카드 (4차 추가분: 실천 팁 카드와 같은 패턴으로
+   눈에 띄게 — 예전엔 muted 한 줄이라 놓치기 쉬웠다. 팁(노란색)과
+   구분되게 경고 톤(빨강 계열)을 쓴다 — dashboard 의 "거절" 버튼과
+   같은 톤(#A32D2D)을 재사용해 팔레트를 늘리지 않는다.) */
+.chat-law-notice-card {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #FDECEC;
+  border: 1px solid #F3B9B9;
+}
+.chat-law-notice-label {
+  font-size: 12px; font-weight: 600;
+  color: #A32D2D; margin-bottom: 4px;
+}
+.chat-law-notice-text {
+  font-size: 13px; color: #7A2323;
+  line-height: 1.55; margin: 0;
+}
+
+/* 연락처 카드 (관리사무소 · 지자체) */
+.chat-contact-cards {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.contact-card {
+  flex: 1 1 200px;
+  min-width: 180px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.contact-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.contact-card-icon { font-size: 18px; line-height: 1; }
+.contact-card-title {
+  font-size: 13px; font-weight: 600;
+  color: var(--color-text);
+}
+.contact-card-subtitle {
   font-size: 11px;
   color: var(--color-text-muted);
-  line-height: 1.4;
+}
+.contact-card-row {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
 }
 
 /* 추천 질문 */
@@ -628,6 +676,24 @@ body {
 }
 .chat-suggest-btn:hover {
   border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Feedback Buttons */
+.chat-feedback {
+  display: flex; gap: 4px; margin-top: 8px;
+}
+.chat-fb-btn {
+  background: none; border: 1px solid var(--color-border);
+  border-radius: 16px; padding: 3px 10px; font-size: 13px;
+  cursor: pointer; transition: all .15s;
+  color: var(--color-text-secondary); line-height: 1.4;
+}
+.chat-fb-btn:hover {
+  border-color: var(--color-primary); background: var(--color-surface);
+}
+.chat-fb-btn.active {
+  border-color: var(--color-primary); background: #E8F5EE;
   color: var(--color-primary);
 }
 
@@ -1240,15 +1306,15 @@ body {
   gap: 8px;
 }
 .land-regions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 .land-region {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 10px 14px;
   background: #FAFAF8;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius);
@@ -1265,13 +1331,19 @@ body {
   color: var(--color-primary);
   font-size: 12px;
   font-weight: 500;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.land-region:hover .land-region-go {
+  opacity: 1;
 }
 .land-rdot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   display: inline-block;
-  margin-right: 8px;
+  flex-shrink: 0;
 }
 .land-info-list {
   display: flex;
@@ -1386,6 +1458,19 @@ body {
   font-size: 11px; padding: 3px 8px; border-radius: 4px;
   background: var(--color-primary-light); color: var(--color-primary-dark);
   font-weight: 500; white-space: nowrap; flex-shrink: 0;
+}
+.land-badge-notice {
+  font-size: 11px; padding: 3px 8px; border-radius: 4px;
+  background: #FCEBEB; color: #A32D2D;
+  font-weight: 600; white-space: nowrap; flex-shrink: 0;
+}
+.land-community-row-notice {
+  background: #F6FAF0; border: 1px solid #D5E6C0; border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 4px; border-bottom: none;
+}
+.land-community-row-notice .land-community-post-title { font-weight: 600; }
+.land-community-row-notice .land-badge-notice {
+  background: #FCEBEB; color: #A32D2D;
 }
 .land-community-post-title {
   font-size: 14px; color: var(--color-text); text-decoration: none;
@@ -1648,6 +1733,25 @@ body {
   gap: 12px;
 }
 .upload-progress.hidden {
+  display: none;
+}
+/* 4차 추가분: 대시보드 문서 업로드 위젯의 범위 선택 패널
+   (templates/dashboard/index.html upload-scope-panel). 사이트 전역에
+   범용 .hidden 규칙이 없어서(스코프별로만 정의) 여기도 같은 패턴으로
+   좁혀서 정의한다. */
+.upload-scope-panel {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.upload-scope-panel.hidden {
+  display: none;
+}
+.form-group.hidden {
+  display: none;
+}
+.form-error.hidden {
   display: none;
 }
 .upload-progress-bar {
@@ -1922,6 +2026,8 @@ body {
 .comm-pill.pill-review.active { background: #854F0B; color: #fff; border-color: #854F0B; }
 .comm-pill.pill-free { border-color: #CECBF6; color: #534AB7; background: #EEEDFE; }
 .comm-pill.pill-free.active { background: #534AB7; color: #fff; border-color: #534AB7; }
+.comm-pill.pill-notice { border-color: #F5C6C6; color: #A32D2D; background: #FCEBEB; }
+.comm-pill.pill-notice.active { background: #A32D2D; color: #fff; border-color: #A32D2D; }
 .comm-sort {
   padding: 7px 12px; font-size: 13px;
   border: 1px solid var(--color-border); border-radius: var(--radius);
@@ -1979,6 +2085,36 @@ body {
 .comm-card-date { font-size: 12px; color: var(--color-text-muted); }
 .comm-card-stats {
   display: flex; gap: 10px; font-size: 12px; color: var(--color-text-muted);
+}
+
+.badge-notice { background: #FCEBEB; color: #A32D2D; font-weight: 600; }
+
+/* -- Notice banner -- */
+.comm-notice-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; margin-bottom: 8px;
+  background: #F6FAF0; border: 1px solid #D5E6C0; border-radius: 10px;
+  text-decoration: none; color: var(--color-text);
+  transition: background 0.15s;
+}
+.comm-notice-banner:hover { background: #EDF5E0; }
+.comm-notice-left {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 0; flex: 1;
+}
+.comm-notice-new {
+  font-size: 10px; font-weight: 700; color: #E53E3E;
+  background: #FFF0F0; padding: 2px 6px; border-radius: 4px;
+  letter-spacing: 0.5px; flex-shrink: 0;
+}
+.comm-notice-title {
+  font-size: 14px; font-weight: 600; color: var(--color-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.comm-notice-right {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--color-text-secondary);
+  flex-shrink: 0; margin-left: 16px;
 }
 
 .comm-empty {

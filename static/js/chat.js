@@ -70,6 +70,9 @@ async function restoreAllSessions() {
           sources: m.sources || [],
           suggested_questions: m.suggested_questions || [],
           law_notice: m.law_notice || '',
+          message_id: m.message_id || null,
+          feedback: m.feedback || null,
+          contact_cards: m.contact_cards || [],
         })),
       };
     });
@@ -203,9 +206,34 @@ function renderMessages() {
       ? `<div class="chat-source-row">출처 ${uniqueSources.map(s => `<span class="chat-source-item">${escapeHtml(s)}</span>`).join('<span class="chat-source-sep">·</span>')}</div>`
       : '';
 
-    // ── 법령 (muted 한 줄) ──
+    // ── 시행 예정 법령 안내 (카드형) ──
     const lawHtml = msg.law_notice
-      ? `<div class="chat-law-text">${escapeHtml(msg.law_notice)}</div>`
+      ? `<div class="chat-law-notice-card">
+           <div class="chat-law-notice-label">⚠️ 시행 예정 법령 안내</div>
+           <p class="chat-law-notice-text">${escapeHtml(msg.law_notice.replace(/^⚠\s*/, ''))}</p>
+         </div>`
+      : '';
+
+    // ── 연락처 카드 (관리사무소 · 지자체) ──
+    const cardsHtml = (msg.contact_cards && msg.contact_cards.length)
+      ? `<div class="chat-contact-cards">${msg.contact_cards.map(c => {
+           const icon = c.type === 'local_gov' ? '🏛️' : '🏢';
+           const subtitle = c.type === 'local_gov' ? (c.department || '지자체') : '관리사무소';
+           const rows = [];
+           if (c.phone) rows.push(`<div class="contact-card-row">📞 ${escapeHtml(c.phone)}</div>`);
+           if (c.address) rows.push(`<div class="contact-card-row">📍 ${escapeHtml(c.address)}</div>`);
+           if (c.hours) rows.push(`<div class="contact-card-row">🕐 ${escapeHtml(c.hours)}</div>`);
+           return `<div class="contact-card">
+             <div class="contact-card-head">
+               <span class="contact-card-icon">${icon}</span>
+               <div>
+                 <div class="contact-card-title">${escapeHtml(c.title || subtitle)}</div>
+                 <div class="contact-card-subtitle">${escapeHtml(subtitle)}</div>
+               </div>
+             </div>
+             ${rows.join('')}
+           </div>`;
+         }).join('')}</div>`
       : '';
 
     // ── 추천 질문 ──
@@ -218,6 +246,14 @@ function renderMessages() {
          </div>`
       : '';
 
+    // ── 피드백 버튼 ──
+    const feedbackHtml = msg.message_id
+      ? `<div class="chat-feedback" data-mid="${msg.message_id}">
+           <button class="chat-fb-btn${msg.feedback === 'positive' ? ' active' : ''}" data-val="positive" onclick="toggleFeedback(${msg.message_id},'positive',this)" title="좋아요">👍</button>
+           <button class="chat-fb-btn${msg.feedback === 'negative' ? ' active' : ''}" data-val="negative" onclick="toggleFeedback(${msg.message_id},'negative',this)" title="싫어요">👎</button>
+         </div>`
+      : '';
+
     return `
       <div class="message bot">
         <div class="message-avatar bot-avatar-msg">🌿</div>
@@ -226,12 +262,38 @@ function renderMessages() {
           ${tipHtml}
           ${sourcesHtml}
           ${lawHtml}
+          ${cardsHtml}
+          ${feedbackHtml}
           ${suggestHtml}
         </div>
       </div>`;
   }).join('');
 
   container.scrollTop = container.scrollHeight;
+}
+
+// ===== 피드백 =====
+async function toggleFeedback(messageId, value, btn) {
+  const session = currentSession();
+  if (!session) return;
+
+  // 같은 값 재클릭 → 취소
+  const msg = session.messages.find(m => m.message_id === messageId);
+  const newVal = (msg && msg.feedback === value) ? null : value;
+
+  try {
+    const url = CONFIG.urls.feedback.replace('/0/', '/' + messageId + '/');
+    const res = await postJson(url, { feedback: newVal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (msg) msg.feedback = newVal;
+  } catch (err) {
+    console.error('피드백 저장 실패:', err);
+    return;
+  }
+  // 버튼 상태만 갱신 (전체 re-render 없이)
+  const wrap = btn.closest('.chat-feedback');
+  wrap.querySelectorAll('.chat-fb-btn').forEach(b => b.classList.remove('active'));
+  if (newVal) btn.classList.add('active');
 }
 
 // ===== 전송 =====
@@ -313,6 +375,9 @@ async function askBackend(question) {
         sources: data.sources || [],
         suggested_questions: data.suggested_questions || [],
         law_notice: data.law_notice || '',
+        message_id: data.message_id || null,
+        feedback: null,
+        contact_cards: data.contact_cards || [],
       });
     }
   } catch (err) {

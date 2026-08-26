@@ -25,4 +25,5 @@ urlpatterns = [
     path("sessions/", views.ChatSessionListView.as_view(), name="sessions"),
     path("sessions/<int:pk>/delete/", views.ChatSessionDeleteView.as_view(), name="session_delete"),
     path("popular/", views.PopularQuestionView.as_view(), name="popular"),
+    path("feedback/<int:pk>/", views.ChatFeedbackView.as_view(), name="feedback"),
 ]

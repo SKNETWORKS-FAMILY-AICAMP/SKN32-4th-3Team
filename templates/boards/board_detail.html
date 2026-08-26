@@ -17,7 +17,8 @@
     <div class="detail-header">
       <div class="community-card-badges">
         {% if board.is_hidden %}<span class="badge badge-hidden">비공개</span>{% endif %}
-        {% if board.category == 'question' %}<span class="badge badge-question">질문</span>
+        {% if board.category == 'notice' %}<span class="badge badge-notice">📢 공지</span>
+        {% elif board.category == 'question' %}<span class="badge badge-question">질문</span>
         {% elif board.category == 'info' %}<span class="badge badge-info">정보공유</span>
         {% elif board.category == 'review' %}<span class="badge badge-review">후기</span>
         {% elif board.category == 'free' %}<span class="badge badge-free">자유</span>

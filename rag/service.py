@@ -58,39 +58,201 @@ PUBLIC_SOURCE_TYPES = ("law", "guide", "apartment")
 # 프론트에 돌려줄 근거 미리보기 길이
 SNIPPET_LENGTH = 140
 
-# 근거가 없을 때 쓰는 문구. 프롬프트의 지시문과 같은 표현을 씁니다.
-NO_ANSWER = "관련 자료를 찾을 수 없습니다"
+# 근거가 없을 때 쓰는 문구. rag/llm.py 의 ANSWER_PROMPT 가 LLM 에게
+# 답을 거부할 때 정확히 이 문구로만 답하라고 지시한다(규칙 2, 7) — ask()
+# 가 생성된 답변이 이 문구로 시작하는지 검사해서 관리사무소 문의 안내로
+# 바꿔치기하는 데 쓴다. LLM 프롬프트의 표현이 바뀌면 이 값도 같이
+# 바꿔야 한다.
+NO_ANSWER = "관련 정보를 찾을 수 없습니다"
+
+# 단지 규정 문서 본문에서 관리사무소 전화번호로 보이는 패턴을 찾을 때 쓴다.
+# 02-1234-5678(지역번호) / 010-1234-5678(휴대전화) / 1588-1234(대표번호)
+# 형태를 모두 잡는다.
+_PHONE_RE = re.compile(r"(0\d{1,2}-\d{3,4}-\d{4}|1[5-9]\d{2}-\d{4})")
+
+# 번호 바로 앞에 "팩스"/"FAX" 라벨이 붙어있으면 그 번호는 건너뛴다.
+# ("팩스: 02-555-1235" 처럼 라벨과 번호 사이의 콜론·공백까지 허용)
+_FAX_LABEL_RE = re.compile(r"(팩스|fax)\s*[:：]?\s*$", re.IGNORECASE)
 
 
-def _office_contact_notice(apartment_id: int) -> str:
-    """단지 관련 질문에 근거를 못 찾았을 때 관리사무소 연락처로 안내한다.
+def _first_non_fax_phone(text: str) -> str:
+    """텍스트에서 팩스번호가 아닌 첫 전화번호를 찾는다.
 
-    apartments 앱을 모듈 최상단에서 import 하지 않는다 — rag/models.py
-    의 Document.apartment 가 문자열 참조("apartments.Apartment")를 쓰는
-    것과 같은 이유(순환참조 회피)로, 함수 안에서만 지연 import 한다.
-
-    등록된 연락처가 하나도 없으면 빈 문자열을 돌려주고, 호출부
-    (ask())가 기존의 일반 안내 문구로 대체한다 — 아무 정보도 없이
-    "관리사무소로 문의하세요"만 던지는 건 오히려 도움이 안 된다.
+    "대표 연락처: 02-555-1234 (팩스: 02-555-1235)" 처럼 한 줄에 전화번호와
+    팩스번호가 같이 있는 경우가 흔하다. 그냥 첫 매치를 쓰면 순서에 따라
+    팩스번호를 관리사무소 전화번호로 잘못 노출할 수 있어서, 번호 바로
+    앞 12자 안에 "팩스"/"FAX" 라벨이 있으면 건너뛰고 다음 매치를 본다.
+    (팩스번호만 있고 진짜 전화번호가 없으면 빈 문자열을 돌려준다 —
+    팩스번호를 대표 연락처로 잘못 안내하는 것보다는 안전하다.)
     """
-    from apartments.models import Apartment
+    for match in _PHONE_RE.finditer(text):
+        prefix = text[max(0, match.start() - 12):match.start()]
+        if _FAX_LABEL_RE.search(prefix):
+            continue
+        return match.group(1)
+    return ""
 
-    try:
-        apartment = Apartment.objects.get(pk=apartment_id)
-    except Apartment.DoesNotExist:
-        return ""
 
-    parts = []
-    if apartment.office_phone:
-        parts.append(f"\U0001F4DE {apartment.office_phone}")
-    if apartment.address:
-        parts.append(f"\U0001F4CD {apartment.address}")
-    if apartment.office_hours:
-        parts.append(f"\U0001F550 {apartment.office_hours}")
-    if not parts:
-        return ""
+def _find_phone_in_apartment_rules(apartment_id: int) -> str:
+    """Apartment.office_phone 이 비어 있을 때의 대체 수단.
 
-    return "관련 자료를 찾을 수 없습니다. 자세한 사항은 관리사무소로 문의해 주세요.\n" + " · ".join(parts)
+    관리사무소 연락처는 관리자가 office_phone 필드를 따로 채워 넣지
+    않았어도, 이미 올려둔 단지 규정 문서(ApartmentRule → Document,
+    apartments/services.py:sync_rule_to_document 가 만든다) 본문 안에
+    "문의: 02-1234-5678" 같은 형태로 이미 적혀 있는 경우가 흔하다.
+    그 본문을 훑어 전화번호로 보이는 첫 패턴을 찾아 대신 쓴다
+    (팩스번호는 _first_non_fax_phone 이 걸러낸다).
+    """
+    from .models import Document, SourceType
+
+    texts = Document.objects.filter(
+        apartment_id=apartment_id,
+        source_type=SourceType.APARTMENT,
+        status=Document.Status.APPROVED,
+    ).values_list("content_text", flat=True)
+
+    for content_text in texts:
+        phone = _first_non_fax_phone(content_text or "")
+        if phone:
+            return phone
+    return ""
+
+
+# 근거를 못 찾았을 때 카드 없이 보여줄 최소 안내 문구.
+# "관련 정보를 찾을 수 없습니다" 류의 막연한 문구는 절대 쓰지 않는다.
+FALLBACK_NOTICE = "문의하신 내용과 관련된 자료를 확인하지 못했습니다. 정확한 안내는 관리사무소로 문의해 주세요."
+
+# 카드(관리사무소·지자체)가 하나라도 있을 때 쓰는 안내 문구.
+# "정확한 안내는 관리사무소로 문의해 주세요"처럼 특정 대상을 콕 집으면
+# 지자체 카드만 뜨거나 둘 다 뜬 경우 어색하다 — 카드 자체가 이미 구체적인
+# 연락처를 보여주므로 문구는 일반적으로 남기고 "아래 연락처"로 안내한다.
+CARDS_NOTICE = "문의하신 내용과 관련된 자료를 확인하지 못했습니다. 아래 연락처를 확인해 주세요."
+
+
+def _notice_text(cards: list[dict]) -> str:
+    """카드 유무에 따라 안내 문구를 고른다."""
+    return CARDS_NOTICE if cards else FALLBACK_NOTICE
+
+
+def _office_card(apartment) -> dict | None:
+    """관리사무소 연락처 카드. 전화·주소·운영시간이 하나도 없으면 None.
+
+    office_phone 필드가 비어 있으면 단지 규정 문서 본문에서 찾아본다
+    (_find_phone_in_apartment_rules) — 관리자가 별도 필드를 안 채워도
+    이미 올려둔 규정 문서에 적혀 있는 경우가 흔하다.
+    """
+    if not apartment:
+        return None
+
+    phone = apartment.office_phone or _find_phone_in_apartment_rules(apartment.pk)
+    if not (phone or apartment.address or apartment.office_hours):
+        return None
+
+    return {
+        "type": "office",
+        "title": "관리사무소",
+        "phone": phone,
+        "address": apartment.address or "",
+        "hours": apartment.office_hours or "",
+    }
+
+
+def _parse_kv_line(line: str) -> dict:
+    """"헤더1: 값1 | 헤더2: 값2" 한 줄을 dict로 되돌린다.
+
+    _read_csv() 가 CSV 한 행을 이 형식으로 바꿔 content_text 에 저장해
+    두므로, 그 짝을 이루는 파서다.
+    """
+    result = {}
+    for segment in line.split(" | "):
+        key, sep, value = segment.partition(": ")
+        if sep:
+            result[key.strip()] = value.strip()
+    return result
+
+
+def _extract_district(address: str) -> str:
+    """주소 문자열에서 "OO구"/"OO군"/"OO시" 같은 기초자치단체 단위를
+    뽑는다. "서울특별시"/"OO광역시" 같은 광역 단위 접미사는 제외한다.
+
+    "서울특별시 강남구 학동로 426" → "강남구"
+    """
+    for token in address.split():
+        if token.endswith(("구", "군")) and not token.endswith(("특별시", "광역시")):
+            return token
+    for token in address.split():
+        if token.endswith("시") and not token.endswith(("특별시", "광역시")):
+            return token
+    return ""
+
+
+def _local_gov_card(apartment) -> dict | None:
+    """지자체 연락처 카드. (4차 추가분)
+
+    서비스 관리자가 CSV(지자체명/전화번호/주소/담당부서 등)를 국가·
+    가이드 범위로 올려두면(rag/forms.py, DocumentUploadView) _read_csv()
+    가 행마다 "헤더: 값" 한 줄로 바꿔 content_text 에 저장한다. 그 줄들
+    중 이 단지 주소의 구/군/시 이름이 들어간 줄을 찾아 연락처를 뽑는다.
+
+    CSV 헤더 이름이 정확히 뭐든("지자체명"/"기관명" 등) 최대한 유연하게
+    대응한다 — "전화번호" 류 키가 없으면 그 줄 안에서 전화번호 패턴을
+    직접 찾는다(_PHONE_RE, 단지 규정 전화번호 추출과 동일한 방식).
+    """
+    if not apartment or not apartment.address:
+        return None
+
+    district = _extract_district(apartment.address)
+    if not district:
+        return None
+
+    from .models import Document, SourceType
+
+    texts = Document.objects.filter(
+        source_type=SourceType.GUIDE, status=Document.Status.APPROVED,
+    ).values_list("content_text", flat=True)
+
+    for content_text in texts:
+        for line in (content_text or "").splitlines():
+            if district not in line:
+                continue
+            row = _parse_kv_line(line)
+            phone = row.get("전화번호") or row.get("연락처") or row.get("전화")
+            if not phone:
+                phone = _first_non_fax_phone(line)
+            if not phone:
+                continue
+            name = row.get("지자체명") or row.get("기관명") or row.get("담당기관") or district
+            return {
+                "type": "local_gov",
+                "title": name,
+                "phone": phone,
+                "address": row.get("주소", ""),
+                "department": row.get("담당부서", ""),
+            }
+    return None
+
+
+def _build_contact_cards(apartment_id: int | None) -> list[dict]:
+    """근거를 못 찾았을 때 카드로 보여줄 연락처 목록. (4차 추가분)
+
+    관리사무소 카드와 지자체 카드를 각각 시도해서 실제로 값이 있는
+    것만 담는다. 아무것도 못 찾으면 빈 리스트 — 호출부(ask())가
+    FALLBACK_NOTICE 텍스트만으로 대체한다.
+    """
+    apartment = None
+    if apartment_id:
+        from apartments.models import Apartment
+
+        apartment = Apartment.objects.filter(pk=apartment_id).first()
+
+    cards = []
+    office = _office_card(apartment)
+    if office:
+        cards.append(office)
+    local_gov = _local_gov_card(apartment)
+    if local_gov:
+        cards.append(local_gov)
+    return cards
 
 # LangChain FAISS 벡터스토어 저장 경로 (legacy 의 index.faiss 와 별개 파일)
 _LANGCHAIN_INDEX_DIR = "langchain"
@@ -549,16 +711,17 @@ def ask(
 
     # 근거가 없으면 LLM을 호출하지 않는다. (환각 방지)
     if not grounding:
-        # 단지 규정 관련 질문인데 근거를 못 찾았으면, 등록된 관리사무소
-        # 연락처가 있는 한 "질문을 구체적으로" 라는 막연한 안내 대신
-        # 관리사무소로 문의하도록 안내한다 — 실제로 답을 줄 수 있는
-        # 곳이 있으면 거기로 보내는 게 사용자에게 더 도움이 된다.
-        office_notice = _office_contact_notice(apartment_id) if apartment_id and not law_notice else ""
+        # "관련 정보를 찾을 수 없습니다" 같은 막연한 안내는 쓰지 않는다.
+        # 법령 시행 전이라 제외된 경우가 아니면 항상 관리사무소·지자체
+        # 문의로 안내하고, 등록된 연락처가 있으면 카드로 같이 보여준다 —
+        # 실제로 답을 줄 수 있는 곳이 있으면 거기로 보내는 게 사용자에게
+        # 더 도움이 된다.
+        contact_cards = [] if law_notice else _build_contact_cards(apartment_id)
         return {
             "answer": (
                 "관련 법령이 아직 시행되지 않아 현재 적용되는 근거를 찾을 수 없습니다."
                 if law_notice else
-                office_notice or "관련 문서를 찾을 수 없습니다. 질문을 조금 더 구체적으로 바꿔 보세요."
+                _notice_text(contact_cards)
             ),
             "tip": "",
             "source": "",
@@ -569,13 +732,37 @@ def ask(
             #  law_notice 가 더 유용한 정보라 추천은 건너뛴다.)
             "suggested_questions": [] if law_notice else suggest_similar_questions(question),
             "law_notice": law_notice,
+            # 4차 추가분: 관리사무소·지자체 연락처 카드.
+            "contact_cards": contact_cards,
         }
 
     sections = _generate_answer(question, _build_context(grounding), history)
+    answer_text = (sections.get("answer", "") or sections.get("guide", "")).strip()
+
+    # 검색은 뭔가를 찾았지만(grounding 이 비어 있지 않았지만) 질문과
+    # 실제로는 무관한 내용이라, LLM 이 프롬프트 지시대로 스스로 답을
+    # 거부한 경우다(ANSWER_PROMPT 규칙 2, 7 — 예: 전기차 충전소 질문에
+    # 에너지 절약 가이드만 검색된 경우). 이때도 "관련 정보를 찾을 수
+    # 없습니다" 를 그대로 노출하지 않고 관리사무소 문의로 안내한다.
+    # 답과 무관한 sources 를 같이 보여주면 오해를 주므로 함께 비운다.
+    if answer_text.startswith(NO_ANSWER):
+        refusal_cards = _build_contact_cards(apartment_id)
+        return {
+            "answer": _notice_text(refusal_cards),
+            "law": "",
+            "tip": "",
+            "source": "",
+            "sources": [],
+            "contexts": [r["content"] for r in grounding],
+            "law_notice": law_notice,
+            "suggested_questions": suggest_similar_questions(question),
+            "contact_cards": refusal_cards,
+        }
+
     source_list = _build_sources(grounding)
 
     return {
-        "answer": sections.get("answer", "") or sections.get("guide", ""),
+        "answer": answer_text,
         "law": sections.get("law", ""),
         "tip": sections.get("tip", ""),
         "source": ", ".join(dict.fromkeys(s["title"] for s in source_list)),
@@ -586,6 +773,7 @@ def ask(
         # 4차 추가분: 근거 중 아직 시행 전인 법령이 있으면 안내 문구.
         "law_notice": law_notice,
         "suggested_questions": [],
+        "contact_cards": [],
     }
 
 
@@ -877,7 +1065,8 @@ def _load_from_files() -> list[dict]:
 
     settings.GUIDE_DIR / DOCS_DIR / LAWS_DIR 를 참조한다.
     """
-    supported = {".txt", ".md", ".pdf"}
+    # 4차 추가분: .csv (DocumentUploadView 와 동일하게 지원).
+    supported = {".txt", ".md", ".pdf", ".csv"}
     documents: list[dict] = []
 
     search_dirs = [settings.GUIDE_DIR, settings.DOCS_DIR, settings.LAWS_DIR]
@@ -938,10 +1127,52 @@ def _read_file(path: Path) -> str:
             return ""
         return "\n".join(p.extract_text() or "" for p in PdfReader(str(path)).pages)
 
+    if path.suffix.lower() == ".csv":
+        return _read_csv(path)
+
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         return path.read_text(encoding="cp949")
+
+
+def _read_csv(path: Path) -> str:
+    """CSV 를 "헤더: 값" 형태의 평문으로 변환한다. (4차 추가분)
+
+    쉼표로 이어진 원본을 그대로 색인하면 임베딩·LLM 프롬프트에 그 형태
+    그대로 들어가 가독성이 떨어지고 검색 품질도 나빠진다. 첫 행을
+    헤더로 보고 각 행을 "헤더1: 값1 | 헤더2: 값2" 한 줄짜리 문장으로
+    바꾼다 — 값이 비어 있는 칸은 건너뛴다.
+
+    엑셀에서 내보낸 한글 CSV는 흔히 cp949/euc-kr 인코딩이고 앞에 BOM 이
+    붙기도 해서, 텍스트 파일과 같은 인코딩 폴백(utf-8 → cp949)에 BOM
+    제거(utf-8-sig)까지 같이 처리한다.
+    """
+    import csv
+    import io as _io
+
+    raw_bytes = path.read_bytes()
+    raw_text = None
+    for encoding in ("utf-8-sig", "cp949"):
+        try:
+            raw_text = raw_bytes.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if raw_text is None:
+        return ""
+
+    rows = [row for row in csv.reader(_io.StringIO(raw_text)) if any(cell.strip() for cell in row)]
+    if not rows:
+        return ""
+
+    header, *data_rows = rows
+    lines = []
+    for row in data_rows:
+        pairs = [f"{h.strip()}: {v.strip()}" for h, v in zip(header, row) if v.strip()]
+        if pairs:
+            lines.append(" | ".join(pairs))
+    return "\n".join(lines)
 
 
 # ─────────────────── 답변 생성 ───────────────────
