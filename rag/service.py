@@ -57,6 +57,37 @@ SNIPPET_LENGTH = 140
 # 근거가 없을 때 쓰는 문구. 프롬프트의 지시문과 같은 표현을 씁니다.
 NO_ANSWER = "관련 자료를 찾을 수 없습니다"
 
+
+def _office_contact_notice(apartment_id: int) -> str:
+    """단지 관련 질문에 근거를 못 찾았을 때 관리사무소 연락처로 안내한다.
+
+    apartments 앱을 모듈 최상단에서 import 하지 않는다 — rag/models.py
+    의 Document.apartment 가 문자열 참조("apartments.Apartment")를 쓰는
+    것과 같은 이유(순환참조 회피)로, 함수 안에서만 지연 import 한다.
+
+    등록된 연락처가 하나도 없으면 빈 문자열을 돌려주고, 호출부
+    (ask())가 기존의 일반 안내 문구로 대체한다 — 아무 정보도 없이
+    "관리사무소로 문의하세요"만 던지는 건 오히려 도움이 안 된다.
+    """
+    from apartments.models import Apartment
+
+    try:
+        apartment = Apartment.objects.get(pk=apartment_id)
+    except Apartment.DoesNotExist:
+        return ""
+
+    parts = []
+    if apartment.office_phone:
+        parts.append(f"\U0001F4DE {apartment.office_phone}")
+    if apartment.address:
+        parts.append(f"\U0001F4CD {apartment.address}")
+    if apartment.office_hours:
+        parts.append(f"\U0001F550 {apartment.office_hours}")
+    if not parts:
+        return ""
+
+    return "관련 자료를 찾을 수 없습니다. 자세한 사항은 관리사무소로 문의해 주세요.\n" + " · ".join(parts)
+
 # LangChain FAISS 벡터스토어 저장 경로 (legacy 의 index.faiss 와 별개 파일)
 _LANGCHAIN_INDEX_DIR = "langchain"
 
@@ -419,11 +450,16 @@ def ask(
 
     # 근거가 없으면 LLM을 호출하지 않는다. (환각 방지)
     if not grounding:
+        # 단지 규정 관련 질문인데 근거를 못 찾았으면, 등록된 관리사무소
+        # 연락처가 있는 한 "질문을 구체적으로" 라는 막연한 안내 대신
+        # 관리사무소로 문의하도록 안내한다 — 실제로 답을 줄 수 있는
+        # 곳이 있으면 거기로 보내는 게 사용자에게 더 도움이 된다.
+        office_notice = _office_contact_notice(apartment_id) if apartment_id and not law_notice else ""
         return {
             "answer": (
                 "관련 법령이 아직 시행되지 않아 현재 적용되는 근거를 찾을 수 없습니다."
                 if law_notice else
-                "관련 문서를 찾을 수 없습니다. 질문을 조금 더 구체적으로 바꿔 보세요."
+                office_notice or "관련 문서를 찾을 수 없습니다. 질문을 조금 더 구체적으로 바꿔 보세요."
             ),
             "tip": "",
             "source": "",

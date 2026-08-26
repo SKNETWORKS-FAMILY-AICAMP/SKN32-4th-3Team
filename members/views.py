@@ -90,19 +90,31 @@ class SignUpView(View):
         from django.contrib import messages
 
         from apartments.models import Membership
-        from apartments.services import apply_for_membership
+        from apartments.services import ServiceAdminCannotApplyError, apply_for_membership
 
+        # design 변경: 서비스 총괄 관리자(is_staff/is_superuser)는 이미
+        # 모든 단지를 관리할 수 있으므로 "관리사무소 관리자로 신청"이
+        # 자동으로 접수되면 안 된다(apply_for_membership 이 막는다). 지금
+        # 회원가입은 항상 is_staff=False 인 새 계정만 만들어서 사실상
+        # 걸릴 일이 없지만, 걸리더라도 트랜잭션 전체가 롤백돼 가입 자체가
+        # 실패하면 안 되므로 이 부분만 따로 감싼다.
+        apartment_apply_blocked = False
         with transaction.atomic():
             member = form.save()
             apartment = form.cleaned_data.get("apartment")
             if apartment:
-                apply_for_membership(
-                    member, apartment, form.cleaned_data["member_type"],
-                    form.cleaned_data.get("decision_note", ""),
-                )
+                try:
+                    apply_for_membership(
+                        member, apartment, form.cleaned_data["member_type"],
+                        form.cleaned_data.get("decision_note", ""),
+                    )
+                except ServiceAdminCannotApplyError:
+                    apartment_apply_blocked = True
 
         login(request, member)
-        if form.cleaned_data.get("apartment"):
+        if apartment_apply_blocked:
+            messages.info(request, "가입이 완료됐습니다. 서비스 총괄 관리자 계정은 별도 단지 관리자 신청이 필요하지 않습니다.")
+        elif form.cleaned_data.get("apartment"):
             role_label = dict(Membership.Role.choices)[form.cleaned_data["member_type"]]
             messages.success(
                 request,

@@ -5,12 +5,33 @@
   {% include 'apartments/_nav.html' %}
   <div class="docs-wrap">
     {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    {% if not apartment and user.is_service_admin %}
+      <div class="docs-head"><h1>단지 규정 관리</h1></div>
+      <p style="color:#888;font-size:13px">서비스 총괄 관리자는 모든 단지의 규정을 관리할 수 있습니다. 단지를 선택해 주세요.</p>
+      <table class="admin-table">
+        <thead><tr><th>지역</th><th>단지명</th><th></th></tr></thead>
+        <tbody>
+        {% for apt in apartments_list %}
+          <tr>
+            <td>{{ apt.get_region_display }}</td>
+            <td>{{ apt.name }}</td>
+            <td><a class="btn btn-outline btn-sm" href="?apartment={{ apt.pk }}">규정 보기</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3">등록된 단지가 없습니다.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
     <div class="docs-head">
       <h1>{{ apartment.name }} 규정</h1>
       {% if can_upload_rule %}
-        <a class="btn btn-primary btn-sm" href="{% url 'apartments:rule_create' %}">+ 규정 등록</a>
+        <a class="btn btn-primary btn-sm" href="{% url 'apartments:rule_create' %}{% if user.is_service_admin %}?apartment={{ apartment.pk }}{% endif %}">+ 규정 등록</a>
       {% endif %}
     </div>
+    {% if user.is_service_admin %}
+      <p style="font-size:13px"><a href="{% url 'apartments:rule_list' %}">← 다른 단지 규정 보기</a></p>
+    {% endif %}
     {% if not can_upload_rule %}
       <p style="color:#888;font-size:13px">
         규정 등록은 관리사무소 관리자만 할 수 있습니다. 바꾸고 싶은 규정이 있다면
@@ -32,6 +53,7 @@
       {% endfor %}
       </tbody>
     </table>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

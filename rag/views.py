@@ -12,6 +12,8 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
+from apartments import permissions as apt_permissions
+from apartments import scope as apt_scope
 from dashboard.views import AdminRequiredMixin
 
 from . import service
@@ -62,23 +64,84 @@ class DocumentUploadView(LoginRequiredMixin, View):
     레코드를 만들지 않고 에러를 돌려줍니다.
     """
 
+    def _extra_context(self, request, apartment, is_manager):
+        """관리사무소 관리자는 소속 단지가 컨텍스트로 이미 잡혀 있지만,
+        최종 서버 관리자(is_service_admin)는 애초에 단지 소속을 가질 수
+        없다(apartments/services.py:ServiceAdminCannotApplyError) — 그래서
+        업로드마다 국가/지역별/특정 아파트 중 범위를 직접 고르게 하고,
+        아파트를 고를 수 있도록 전체 목록을 같이 내려준다."""
+        is_service_admin = request.user.is_service_admin
+        context = {"is_manager": is_manager, "apartment": apartment, "is_service_admin": is_service_admin}
+        if is_service_admin:
+            from apartments.models import Apartment
+
+            context["apartments_list"] = Apartment.objects.order_by("region", "name")
+        return context
+
     def get(self, request):
-        return render(request, "rag/document_upload.html", {"form": DocumentUploadForm()})
+        # design 변경: 관리사무소 관리자는 지역을 직접 고르지 않는다 —
+        # 업로드한 문서가 자동으로 "그 단지" 문서가 되어 같은 단지
+        # 입주민의 챗봇 답변에 바로 반영된다(아래 post() 참고).
+        apartment = apt_scope.current_apartment(request)
+        is_manager = bool(apartment) and apt_permissions.can_manage_apartment(request.user, apartment.pk)
+        return render(
+            request, "rag/document_upload.html",
+            {"form": DocumentUploadForm(), **self._extra_context(request, apartment, is_manager)},
+        )
 
     def post(self, request):
+        apartment = apt_scope.current_apartment(request)
+        is_manager = bool(apartment) and apt_permissions.can_manage_apartment(request.user, apartment.pk)
+        extra_context = self._extra_context(request, apartment, is_manager)
+
         form = DocumentUploadForm(request.POST, request.FILES)
         if not form.is_valid():
             return render(
-                request, "rag/document_upload.html", {"form": form}, status=400
+                request, "rag/document_upload.html", {"form": form, **extra_context}, status=400,
             )
 
         doc: Document = form.save(commit=False)
-        # 관리자가 대시보드에서 as_public 로 올리면 전체 공개 가이드가 된다.
-        # (3차 admin 업로드가 guide 폴더에 저장하던 의미를 계승.
-        #  일반 회원의 as_public 요청은 무시 — 권한 상승 방지)
-        if request.POST.get("as_public") and request.user.is_service_admin:
+        if extra_context["is_service_admin"]:
+            # design 변경(4차 추가): 관리사무소 관리자는 업로드 = 자기
+            # 단지 규정으로 고정할 수 있지만, 서비스 총괄 관리자는 국가
+            # 전체(법령류)일 수도, 특정 지역 가이드일 수도, 특정 단지
+            # 규정일 수도 있다 — 매번 명시적으로 범위를 고르게 한다.
             doc.owner = None
-            doc.source_type = SourceType.GUIDE
+            upload_scope = request.POST.get("upload_scope", "national")
+            if upload_scope == "apartment":
+                from apartments.models import Apartment
+
+                target_apartment = Apartment.objects.filter(
+                    pk=request.POST.get("target_apartment")
+                ).first()
+                if not target_apartment:
+                    form.add_error(None, "문서를 등록할 아파트를 선택해 주세요.")
+                    return render(
+                        request, "rag/document_upload.html", {"form": form, **extra_context}, status=400,
+                    )
+                doc.source_type = SourceType.APARTMENT
+                doc.apartment = target_apartment
+                doc.region = target_apartment.region
+                doc.status = Document.Status.APPROVED
+            elif upload_scope == "region":
+                if not doc.region:
+                    form.add_error("region", "지역을 선택해 주세요.")
+                    return render(
+                        request, "rag/document_upload.html", {"form": form, **extra_context}, status=400,
+                    )
+                doc.source_type = SourceType.GUIDE
+            else:
+                doc.source_type = SourceType.GUIDE
+                doc.region = None
+        elif is_manager:
+            # 관리사무소 관리자 업로드는 지역+아파트 메타데이터가 자동으로
+            # 붙는다. rag.service.search() 의 기존 apartment_id
+            # fail-closed 필터가 격리를 그대로 처리하므로 태깅만 하면 된다.
+            doc.owner = None
+            doc.source_type = SourceType.APARTMENT
+            doc.apartment = apartment
+            doc.region = apartment.region
+            doc.status = Document.Status.APPROVED
         else:
             doc.owner = request.user
             doc.source_type = SourceType.MANUAL
@@ -92,7 +155,7 @@ class DocumentUploadView(LoginRequiredMixin, View):
                 "텍스트를 추출하지 못했습니다. 스캔 PDF 라면 OCR 처리 후 다시 올려 주세요.",
             )
             return render(
-                request, "rag/document_upload.html", {"form": form}, status=400
+                request, "rag/document_upload.html", {"form": form, **extra_context}, status=400,
             )
 
         doc.content_text = text
