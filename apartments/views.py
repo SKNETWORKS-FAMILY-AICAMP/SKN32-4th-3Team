@@ -326,6 +326,11 @@ class ManagerDashboardView(LoginRequiredMixin, View):
             apartment_id__in=apt_ids, is_hidden=True,
         ).select_related("author", "hidden_by", "apartment").order_by("-hidden_at")
 
+        # 단지 규정
+        rules = ApartmentRule.objects.filter(
+            apartment_id__in=apt_ids,
+        ).select_related("apartment", "submitted_by").order_by("-created_at")
+
         return render(request, "apartments/manager_dashboard.html", {
             "apartment": apartment,
             "pending": pending,
@@ -334,6 +339,8 @@ class ManagerDashboardView(LoginRequiredMixin, View):
             "resident_count": residents.count(),
             "hidden_boards": hidden_boards,
             "hidden_count": hidden_boards.count(),
+            "rules": rules,
+            "rule_count": rules.count(),
         })
 
 
@@ -495,3 +502,32 @@ class ApartmentRuleCreateView(LoginRequiredMixin, View):
         # 돌아가게 한다 — 일반 관리자는 current_apartment() 로 어차피
         # 같은 단지를 보게 되므로 파라미터가 있어도 무해하다.
         return redirect(f"{reverse('apartments:rule_list')}?apartment={apartment.pk}")
+
+
+class ApartmentRuleDeleteView(LoginRequiredMixin, View):
+    """단지 규정 삭제. 관리자만 접근 가능. 연동 Document 도 함께 제거하고
+    인덱스를 재구축한다."""
+
+    def post(self, request, pk):
+        rule = get_object_or_404(ApartmentRule, pk=pk)
+        if not permissions.can_manage_apartment(request.user, rule.apartment_id):
+            raise Http404("접근 권한이 없습니다.")
+
+        # 연동 Document 제거 + 인덱스 재구축
+        if rule.document_id:
+            from rag.models import Document
+            Document.objects.filter(pk=rule.document_id).delete()
+            try:
+                from rag import service as rag_service
+                rag_service.rebuild_index()
+            except Exception:
+                pass
+
+        rule.delete()
+        messages.success(request, "규정이 삭제되었습니다.")
+
+        # 대시보드에서 왔으면 대시보드로, 아니면 규정 목록으로
+        next_url = request.POST.get("next", "")
+        if next_url == "dashboard":
+            return redirect("apartments:manager_dashboard")
+        return redirect("apartments:rule_list")

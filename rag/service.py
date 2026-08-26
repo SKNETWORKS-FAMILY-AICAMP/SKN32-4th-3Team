@@ -684,20 +684,22 @@ def _load_documents() -> list[dict]:
     **방향만 바뀌어 재발**하는 구조이고, 실제로 퀵스타트 실행 검증에서
     재발을 확인했습니다 (업로드 직후 검색에 안 잡힘).
 
-    그래서 사용자 업로드(manual)는 **어느 모드에서든 DB 에서** 읽습니다.
-        db    모드: DB 전체 (law + guide + manual)
-        files 모드: 폴더 (law + guide) + DB (manual)
+    그래서 사용자 업로드(manual)와 단지 규정(apartment)은
+    **어느 모드에서든 DB 에서** 읽습니다.
+        db    모드: DB 전체 (law + guide + manual + apartment)
+        files 모드: 폴더 (law + guide) + DB (manual + apartment)
     """
     if settings.RAG_SOURCE.lower() == "files":
-        return _load_from_files() + _load_from_db(only_manual=True)
+        return _load_from_files() + _load_from_db(only_db_native=True)
     return _load_from_db()
 
 
-def _load_from_db(only_manual: bool = False) -> list[dict]:
+def _load_from_db(only_db_native: bool = False) -> list[dict]:
     """documents 테이블에서 문서를 읽는다.
 
-    only_manual=True 면 사용자 업로드(manual)만 읽는다 — files 모드가
-    폴더의 공용 문서에 DB 의 업로드 문서를 합칠 때 쓴다 (_load_documents).
+    only_db_native=True 면 폴더에서 읽을 수 없는 문서 유형
+    (manual + apartment)만 읽는다 — files 모드가 폴더의 공용 문서에
+    DB 전용 문서를 합칠 때 쓴다 (_load_documents).
 
     ── 3차 대비 달라진 점 ──
     1. SQLAlchemy 세션 → Django ORM. 호출부가 db 세션을 넘길 수도 있게
@@ -713,8 +715,8 @@ def _load_from_db(only_manual: bool = False) -> list[dict]:
     # 4차 2R 추가분: 색인 게이트. 검토를 안 거친 데이터(단지 규정 draft 등)는
     # 여기서 걸러야 search()/_apply_quota() 로직에 영향을 안 준다.
     queryset = Document.objects.filter(status=Document.Status.APPROVED)
-    if only_manual:
-        queryset = queryset.filter(source_type=SourceType.MANUAL)
+    if only_db_native:
+        queryset = queryset.filter(source_type__in=[SourceType.MANUAL, SourceType.APARTMENT])
 
     documents: list[dict] = []
 
@@ -741,8 +743,8 @@ def _load_from_db(only_manual: bool = False) -> list[dict]:
             }
         )
 
-    if not documents and not only_manual:
-        # only_manual(files 모드의 업로드 문서 읽기)에서는 0건이 정상이므로
+    if not documents and not only_db_native:
+        # only_db_native(files 모드의 DB 전용 문서 읽기)에서는 0건이 정상이므로
         # 경고하지 않는다 — "seed_docs 를 실행하라"는 안내가 오해를 부른다.
         import logging
 
