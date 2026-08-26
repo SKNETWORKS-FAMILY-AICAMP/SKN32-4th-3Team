@@ -147,7 +147,9 @@ document.getElementById('region-select').addEventListener('change', function () 
 });
 
 // ===== 메시지 렌더링 (리디자인) =====
-const QUICK_ICONS = ['♻️', '🧴', '🍎', '🗑️'];
+const QUICK_ICONS = ['♻️', '🧴', '🍎', '🦴'];
+const QUICK_TITLES = ['배달 용기 분리수거', '페트병 라벨', '음식물쓰레기 배출', '뼈다귀 분류'];
+const QUICK_SUBS = ['어떻게 해야 하나요?', '꼭 떼야 하나요?', '방법 알려주세요', '음식물쓰레기인가요?'];
 
 function renderMessages() {
   const container = document.getElementById('chat-messages');
@@ -157,10 +159,10 @@ function renderMessages() {
     container.innerHTML = `
       <div class="welcome-message">
         <div class="welcome-icon-wrap"><span class="welcome-leaf">🌿</span></div>
-        <h3>무엇이든 물어보세요</h3>
-        <p>분리배출, 음식물쓰레기, 대형폐기물 등<br>환경 실천에 관한 궁금증을 해결해 드려요</p>
+        <h3>안녕하세요! 무엇이든 물어보세요</h3>
+        <p>분리배출, 음식물쓰레기, 대형폐기물, 에너지 절약까지<br>우리 동네 환경 실천을 도와드려요</p>
         <div class="quick-grid">
-          ${quickQuestions.map((q, i) => `<button class="quick-card" onclick="sendQuickQuestion(this.dataset.q)" data-q="${escapeHtml(q)}"><span class="quick-card-icon">${QUICK_ICONS[i] || '💬'}</span>${escapeHtml(q)}</button>`).join('')}
+          ${quickQuestions.map((q, i) => `<button class="quick-card" onclick="sendQuickQuestion(this.dataset.q)" data-q="${escapeHtml(q)}"><span class="quick-card-icon">${QUICK_ICONS[i] || '💬'}</span><span class="quick-card-text"><span class="quick-card-title">${QUICK_TITLES[i] || escapeHtml(q)}</span><span class="quick-card-sub">${QUICK_SUBS[i] || ''}</span></span></button>`).join('')}
         </div>
       </div>`;
     return;

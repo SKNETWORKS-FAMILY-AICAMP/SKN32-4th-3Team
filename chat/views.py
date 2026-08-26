@@ -81,6 +81,7 @@ class ChatRoomView(LoginRequiredMixin, View):
                 # 4차 UI 리디자인: 사이드바에 단지명·역할 표시
                 "apartment_name": str(apartment) if apartment else None,
                 "membership_role": membership.get_role_display() if membership else None,
+                "is_manager": bool(membership and membership.role == "manager"),
             },
         )
 

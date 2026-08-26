@@ -256,8 +256,10 @@ class MembershipDecisionView(LoginRequiredMixin, View):
         membership.save(update_fields=["status", "approved_by", "decided_at", "decision_note", "is_primary"])
         messages.success(request, f"{membership.member} 님의 신청을 처리했습니다 ({membership.get_status_display()}).")
 
-        redirect_name = "apartments:membership_queue" if membership.role == Membership.Role.MANAGER else "apartments:resident_queue"
-        return redirect(redirect_name)
+        # 관리자 신청 → 관리자 승인 큐, 입주민 신청 → 중간관리자 대시보드
+        if membership.role == Membership.Role.MANAGER:
+            return redirect("apartments:membership_queue")
+        return redirect("apartments:manager_dashboard")
 
 
 class MembershipLeaveView(LoginRequiredMixin, View):
@@ -291,6 +293,48 @@ class MembershipLeaveView(LoginRequiredMixin, View):
         else:
             messages.success(request, f"{membership.member} 님의 {membership.get_role_display()} 승인을 박탈했습니다.")
         return redirect("apartments:mine")
+
+
+class ManagerDashboardView(LoginRequiredMixin, View):
+    """중간관리자 전용 대시보드. 승인 큐 + 입주민 명단 + 비공개 게시글."""
+
+    def get(self, request):
+        from boards.models import Board
+
+        managed_ids = permissions.managed_apartment_ids(request.user)
+        if not managed_ids:
+            raise Http404("접근 권한이 없습니다.")
+
+        # 현재 단지
+        apartment = scope.current_apartment(request)
+        apt_ids = managed_ids
+
+        # 승인 대기
+        pending = Membership.objects.filter(
+            apartment_id__in=apt_ids, role=Membership.Role.RESIDENT,
+            status=Membership.Status.REQUESTED,
+        ).select_related("member", "apartment").order_by("-applied_at")
+
+        # 승인된 입주민
+        residents = Membership.objects.filter(
+            apartment_id__in=apt_ids, role=Membership.Role.RESIDENT,
+            status=Membership.Status.APPROVED,
+        ).select_related("member", "apartment").order_by("-decided_at")
+
+        # 비공개 처리된 게시글
+        hidden_boards = Board.objects.filter(
+            apartment_id__in=apt_ids, is_hidden=True,
+        ).select_related("author", "hidden_by", "apartment").order_by("-hidden_at")
+
+        return render(request, "apartments/manager_dashboard.html", {
+            "apartment": apartment,
+            "pending": pending,
+            "pending_count": pending.count(),
+            "residents": residents,
+            "resident_count": residents.count(),
+            "hidden_boards": hidden_boards,
+            "hidden_count": hidden_boards.count(),
+        })
 
 
 class ResidentRosterView(LoginRequiredMixin, View):

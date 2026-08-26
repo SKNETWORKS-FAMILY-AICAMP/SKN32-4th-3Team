@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}단지 관리 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  {% include 'apartments/_nav.html' %}
+  <div class="md-wrap">
+
+    <!-- 헤더 -->
+    <div class="md-header">
+      <div>
+        <h1 class="md-title">단지 관리</h1>
+        {% if apartment %}
+          <p class="md-subtitle">[{{ apartment.get_region_display }}] {{ apartment.name }} · 관리사무소 관리자</p>
+        {% endif %}
+      </div>
+      <a href="{% url 'chat:room' %}" class="md-back-link">← 챗봇으로</a>
+    </div>
+
+    <!-- 통계 카드 -->
+    <div class="md-stats">
+      <div class="md-stat-card">
+        <span class="md-stat-label">승인 대기</span>
+        <span class="md-stat-value md-stat-accent">{{ pending_count }}건</span>
+      </div>
+      <div class="md-stat-card">
+        <span class="md-stat-label">승인된 입주민</span>
+        <span class="md-stat-value">{{ resident_count }}명</span>
+      </div>
+      <div class="md-stat-card">
+        <span class="md-stat-label">비공개 처리 글</span>
+        <span class="md-stat-value md-stat-warning">{{ hidden_count }}건</span>
+      </div>
+    </div>
+
+    <!-- 입주민 승인 대기 -->
+    <div class="md-section">
+      <h2 class="md-section-title">입주민 승인 대기</h2>
+      {% if pending %}
+        <table class="admin-table">
+          <thead>
+            <tr><th>신청자</th><th>동/호수</th><th>단지</th><th>신청일</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for m in pending %}
+              <tr>
+                <td>{{ m.member.display_name }} ({{ m.member.nickname }})</td>
+                <td>{{ m.decision_note|default:"-" }}</td>
+                <td>{{ m.apartment.name }}</td>
+                <td>{{ m.applied_at|date:"Y.m.d" }}</td>
+                <td style="text-align:right">
+                  <form method="post" action="{% url 'apartments:membership_decide' m.pk %}" style="display:inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="approve">
+                    <button type="submit" class="btn btn-primary btn-sm">승인</button>
+                  </form>
+                  <form method="post" action="{% url 'apartments:membership_decide' m.pk %}" style="display:inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reject">
+                    <button type="submit" class="btn btn-outline btn-sm md-btn-danger">거절</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="md-empty">승인 대기 중인 신청이 없습니다.</p>
+      {% endif %}
+    </div>
+
+    <!-- 승인된 입주민 -->
+    <div class="md-section">
+      <h2 class="md-section-title">승인된 입주민</h2>
+      {% if residents %}
+        <table class="admin-table">
+          <thead>
+            <tr><th>이름</th><th>닉네임</th><th>단지</th><th>승인일</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for m in residents %}
+              <tr>
+                <td>{{ m.member.display_name }}</td>
+                <td>{{ m.member.nickname }}</td>
+                <td>{{ m.apartment.name }}</td>
+                <td>{{ m.decided_at|date:"Y.m.d"|default:"-" }}</td>
+                <td style="text-align:right">
+                  <form method="post" action="{% url 'apartments:membership_leave' m.pk %}"
+                        onsubmit="return confirm('{{ m.member.display_name }} 님의 승인을 박탈할까요?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline btn-sm md-btn-danger">승인 박탈</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="md-empty">승인된 입주민이 없습니다.</p>
+      {% endif %}
+    </div>
+
+    <!-- 비공개 처리된 게시글 -->
+    <div class="md-section">
+      <h2 class="md-section-title">비공개 처리된 게시글</h2>
+      {% if hidden_boards %}
+        <table class="admin-table">
+          <thead>
+            <tr><th>제목</th><th>작성자</th><th>비공개 처리일</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for board in hidden_boards %}
+              <tr>
+                <td><a href="{% url 'boards:detail' board.pk %}">{{ board.title }}</a></td>
+                <td>{{ board.author.nickname|default:board.author.display_name }}</td>
+                <td>{{ board.hidden_at|date:"Y.m.d"|default:"-" }}</td>
+                <td style="text-align:right">
+                  <form method="post" action="{% url 'boards:hide' board.pk %}" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline btn-sm">공개로 전환</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="md-empty">비공개 처리된 게시글이 없습니다.</p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

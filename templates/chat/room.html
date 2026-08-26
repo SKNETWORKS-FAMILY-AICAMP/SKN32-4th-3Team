@@ -50,15 +50,10 @@
       <div class="sb-links">
         {% if user.is_service_admin %}
           <a class="sb-link" href="{% url 'dashboard:index' %}" style="text-decoration:none">🛠 관리자</a>
-        {% endif %}
-        {% if can_access_community %}
-          <a class="sb-link" href="{% url 'boards:list' %}" style="text-decoration:none">👥 커뮤니티</a>
+        {% elif is_manager %}
+          <a class="sb-link" href="{% url 'apartments:manager_dashboard' %}" style="text-decoration:none">🛠 단지 관리</a>
         {% endif %}
         <a class="sb-link" href="{% url 'members:mypage' %}" style="text-decoration:none">👤 마이페이지</a>
-        <form method="post" action="{% url 'members:logout' %}" style="display:inline">
-          {% csrf_token %}
-          <button type="submit" class="sb-link">🚪 로그아웃</button>
-        </form>
       </div>
     </div>
   </aside>
@@ -67,6 +62,10 @@
   <main class="chat-main">
     <div class="chat-header">
       <h2 id="chat-title">새 대화</h2>
+      <form method="post" action="{% url 'members:logout' %}" style="margin-left:auto">
+        {% csrf_token %}
+        <button type="submit" class="chat-logout-btn">로그아웃</button>
+      </form>
     </div>
 
     <div class="chat-messages" id="chat-messages"><!-- chat.js 렌더링 --></div>
