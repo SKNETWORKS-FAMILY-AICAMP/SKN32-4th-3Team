@@ -27,6 +27,10 @@
         <span class="md-stat-value">{{ resident_count }}명</span>
       </div>
       <div class="md-stat-card">
+        <span class="md-stat-label">등록된 규정</span>
+        <span class="md-stat-value">{{ rule_count }}건</span>
+      </div>
+      <div class="md-stat-card">
         <span class="md-stat-label">비공개 처리 글</span>
         <span class="md-stat-value md-stat-warning">{{ hidden_count }}건</span>
       </div>
@@ -125,6 +129,40 @@
         </table>
       {% else %}
         <p class="md-empty">비공개 처리된 게시글이 없습니다.</p>
+      {% endif %}
+    </div>
+
+    <!-- 단지 규정 관리 -->
+    <div class="md-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h2 class="md-section-title" style="margin-bottom:0">단지 규정</h2>
+        <a href="{% url 'apartments:rule_create' %}" class="btn btn-primary btn-sm">+ 규정 등록</a>
+      </div>
+      {% if rules %}
+        <table class="admin-table">
+          <thead>
+            <tr><th>분류</th><th>내용 요약</th><th>등록일</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for rule in rules %}
+              <tr>
+                <td><span class="md-rule-badge">{{ rule.get_category_display }}</span></td>
+                <td>{{ rule.content|truncatechars:60 }}</td>
+                <td>{{ rule.created_at|date:"Y.m.d" }}</td>
+                <td style="text-align:right">
+                  <form method="post" action="{% url 'apartments:rule_delete' rule.pk %}" style="display:inline"
+                        onsubmit="return confirm('이 규정을 삭제할까요? 챗봇 답변에서도 제거됩니다.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="dashboard">
+                    <button type="submit" class="btn btn-outline btn-sm md-btn-danger">삭제</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="md-empty">등록된 규정이 없습니다. 규정을 등록하면 챗봇이 답변에 활용합니다.</p>
       {% endif %}
     </div>
 

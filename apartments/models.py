@@ -127,11 +127,10 @@ class ApartmentRule(models.Model):
     """
 
     class Category(models.TextChoices):
-        FOOD = "food", "음식물"
-        RECYCLE = "recycle", "재활용"
-        BULKY = "bulky", "대형폐기물"
-        TIME = "time", "배출시간"
-        PLACE = "place", "배출장소"
+        PLACE_TIME = "place_time", "배출 장소/시간"
+        METHOD = "method", "처리 방식"
+        COST_ADMIN = "cost_admin", "비용/행정"
+        FACILITY = "facility", "단지 특수 시설"
         ETC = "etc", "기타"
 
     class SourceLevel(models.TextChoices):

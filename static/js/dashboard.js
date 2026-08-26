@@ -57,15 +57,16 @@ async function loadAdminRegionStats() {
     const container = document.getElementById('region-stats-container');
     if (!data.length) { container.innerHTML = '<p class="stat-placeholder">질문 데이터가 없습니다.</p>'; return; }
     const total = data.reduce((s, r) => s + r.count, 0);
-    const colors = ['#4A7C59', '#6B9E78', '#8FBC8F'];
+    const regionColors = ['#3B6D11', '#84C7A7', '#97B6E6'];
     container.innerHTML = data.map((r, i) => {
       const pct = total > 0 ? Math.round(r.count / total * 100) : 0;
-      return `<div style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
-          <span>${escapeHtml(r.label)}</span><span>${r.count}건 (${pct}%)</span>
+      const color = regionColors[i % regionColors.length];
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>${escapeHtml(r.label)}</span><span style="color:#6B6B65">${r.count}건 (${pct}%)</span>
         </div>
-        <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden">
-          <div style="width:${pct}%;height:100%;background:${colors[i % colors.length]};border-radius:4px"></div>
+        <div style="height:6px;background:#F0F0EC;border-radius:3px">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:3px"></div>
         </div>
       </div>`;
     }).join('');
@@ -81,9 +82,9 @@ async function loadAdminTopQuestions() {
     const data = await res.json();
     if (!data.length) { container.innerHTML = '<p class="stat-placeholder">질문 데이터가 없습니다.</p>'; return; }
     container.innerHTML = data.map((q, i) =>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
-        <span><strong>${i + 1}.</strong> ${escapeHtml(q.question.length > 30 ? q.question.substring(0, 30) + '...' : q.question)}</span>
-        <span style="color:#888;white-space:nowrap;margin-left:8px">${q.count}건</span>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid #E2E2DC;font-size:13px">
+        <span><strong style="color:#3B6D11;margin-right:6px">${i + 1}.</strong>${escapeHtml(q.question.length > 30 ? q.question.substring(0, 30) + '...' : q.question)}</span>
+        <span style="color:#6B6B65;white-space:nowrap;margin-left:8px">${q.count}건</span>
       </div>`
     ).join('');
   } catch (_) {
@@ -100,13 +101,18 @@ async function loadAdminDailyTrend() {
     const container = document.getElementById('daily-chart-container');
     if (!data.length) { container.innerHTML = '<p class="stat-placeholder">데이터가 없습니다.</p>'; return; }
     const maxCount = Math.max(...data.map(d => d.count), 1);
+    const len = data.length;
     container.innerHTML = `<div style="display:flex;align-items:flex-end;gap:12px;height:160px;padding:10px 0">
-      ${data.map(d => {
+      ${data.map((d, i) => {
         const h = Math.max(d.count / maxCount * 130, 4);
+        const t = len > 1 ? i / (len - 1) : 1;
+        const r = Math.round(181 + (59 - 181) * t);
+        const g = Math.round(201 + (109 - 201) * t);
+        const b = Math.round(138 + (17 - 138) * t);
         return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
-          <span style="font-size:11px;color:#666">${d.count}</span>
-          <div style="width:100%;max-width:40px;height:${h}px;background:#4A7C59;border-radius:4px 4px 0 0"></div>
-          <span style="font-size:11px;color:#888">${d.date}<br>${d.day}</span>
+          <span style="font-size:11px;color:#6B6B65">${d.count}</span>
+          <div style="width:100%;max-width:40px;height:${h}px;background:rgb(${r},${g},${b});border-radius:3px 3px 0 0"></div>
+          <span style="font-size:11px;color:#9B9B95">${d.date}<br>${d.day}</span>
         </div>`;
       }).join('')}
     </div>`;
@@ -122,17 +128,40 @@ async function loadAdminDocuments() {
     const statusEl = document.getElementById('index-status');
     if (statusEl) {
       statusEl.innerHTML = data.index_exists
-        ? `<span class="index-dot" style="background:#4A7C59"></span><span>인덱스 활성 (${data.total_chunks}개 청크)</span>`
-        : `<span class="index-dot" style="background:#ccc"></span><span>인덱스 없음</span>`;
+        ? `<span class="index-dot" style="background:#3B6D11"></span><span>인덱스 활성 (${data.total_chunks}개 청크)</span>`
+        : `<span class="index-dot"></span><span>인덱스 없음</span>`;
     }
+    // 문서 유형별 통계 카드
+    const docs = data.documents || [];
+    const lawCount = docs.filter(d => d.source_type === 'law').length;
+    const guideCount = docs.filter(d => d.source_type === 'guide').length;
+    const aptCount = docs.filter(d => d.source_type === 'apartment').length;
+    const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setEl('doc-stat-total', docs.length);
+    setEl('doc-stat-law', lawCount);
+    setEl('doc-stat-guide', guideCount);
+    setEl('doc-stat-apartment', aptCount);
+
     const tbody = document.getElementById('doc-table-body');
-    if (!data.documents || !data.documents.length) {
+    if (!docs.length) {
       tbody.innerHTML = '<tr><td colspan="4" class="stat-placeholder">문서가 없습니다.</td></tr>';
       return;
     }
-    tbody.innerHTML = data.documents.map(d =>
-      `<tr><td>${escapeHtml(d.title)}</td><td>${escapeHtml(d.type_label)}</td><td>${escapeHtml(d.region_label)}</td><td>${d.chunk_count}</td></tr>`
-    ).join('');
+    const typeBadgeColors = {
+      '법령': {bg:'#E6F1FB',color:'#185FA5'},
+      '가이드': {bg:'#EAF3DE',color:'#3B6D11'},
+      '단지 규정': {bg:'#FFF3E0',color:'#8B5E0B'},
+      '사용자 문서': {bg:'#F0F0EC',color:'#5A5A55'},
+    };
+    tbody.innerHTML = docs.map(d => {
+      const badge = typeBadgeColors[d.type_label] || {bg:'#F0F0EC',color:'#5A5A55'};
+      return `<tr>
+        <td>${escapeHtml(d.title)}</td>
+        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;background:${badge.bg};color:${badge.color}">${escapeHtml(d.type_label)}</span></td>
+        <td>${escapeHtml(d.region_label)}</td>
+        <td>${d.chunk_count}</td>
+      </tr>`;
+    }).join('');
   } catch (_) {}
 }
 

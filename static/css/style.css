@@ -697,13 +697,19 @@ body {
 }
 
 /* ===== Admin Layout ===== */
+/* ═══════════════════════════════════════════
+   최종관리자 대시보드 — Admin Dashboard
+   목업 기준: dm-* 스타일 (미니멀, border 기반, 그림자 없음)
+   ═══════════════════════════════════════════ */
 .admin-layout {
   width: 100%;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
+  background: #FFFFFB;
 }
+
+/* ── 헤더 ── */
 .admin-header {
   height: var(--header-height);
   padding: 0 24px;
@@ -720,32 +726,71 @@ body {
   gap: 8px;
 }
 .admin-header-left h2 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
+  color: var(--color-text);
 }
+.admin-header-left .btn-icon {
+  color: var(--color-text-secondary);
+  margin-right: 4px;
+}
+.admin-header-left .btn-icon:hover { color: var(--color-text); }
+
+/* ── 탭 ── */
 .admin-tabs {
   display: flex;
   gap: 0;
 }
 .admin-tab {
-  padding: 8px 20px;
+  padding: 8px 16px;
   border: none;
   background: none;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 400;
   color: var(--color-text-secondary);
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: all var(--transition);
+  transition: all 0.15s;
 }
 .admin-tab:hover {
   color: var(--color-text);
 }
 .admin-tab.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
+  font-weight: 500;
+}
+.ad-tab-badge {
+  display: inline-block;
+  background: #FCEBEB;
+  color: #A32D2D;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.ad-region-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #EAF3DE;
+  color: #3B6D11;
+  font-size: 11px;
+  font-weight: 500;
+}
+.ad-plain-section {
+  margin-bottom: 24px;
+}
+.ad-section-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 10px;
 }
 
+/* ── 콘텐츠 영역 ── */
 .admin-content {
   flex: 1;
   padding: 24px;
@@ -755,53 +800,59 @@ body {
   display: none;
 }
 
-/* Stats */
+/* ── 통계 카드 ── */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 0.5px solid var(--color-border);
 }
 .stat-card {
-  background: var(--color-surface);
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
+  padding: 14px 16px;
+  border: none;
+  background: none;
 }
 .stat-label {
   font-size: 12px;
   color: var(--color-text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+  display: block;
 }
 .stat-value {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--color-text);
 }
-.stat-value.green { color: var(--color-green); }
-.stat-value.blue { color: var(--color-blue); }
+.stat-value.green { color: #3B6D11; }
+.stat-value.blue { color: #185FA5; }
 .stat-value.amber { color: var(--color-amber); }
+.stat-value.red { color: #A32D2D; }
 .stat-change {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-muted);
-  margin-top: 4px;
+  margin-top: 2px;
 }
-.stat-change.up { color: var(--color-green); }
+.stat-change.up { color: #3B6D11; }
 
+/* ── 섹션 카드 ── */
 .stats-section {
   background: var(--color-surface);
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
+  padding: 16px;
+  border-radius: 12px;
+  border: 0.5px solid var(--color-border);
   margin-bottom: 16px;
 }
 .stats-section h3 {
   font-size: 15px;
   font-weight: 500;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  color: var(--color-text);
 }
 
 /* Region Bars */
-.region-stats { display: flex; flex-direction: column; gap: 12px; }
+.region-stats { display: flex; flex-direction: column; gap: 10px; }
 .region-bar {
   display: flex;
   align-items: center;
@@ -815,14 +866,14 @@ body {
 }
 .region-bar-track {
   flex: 1;
-  height: 20px;
+  height: 6px;
   background: var(--color-surface-alt);
-  border-radius: 6px;
+  border-radius: 3px;
   overflow: hidden;
 }
 .region-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 3px;
   transition: width 0.5s ease;
 }
 .region-bar-value {
@@ -832,29 +883,31 @@ body {
   text-align: right;
 }
 
-/* Admin Table */
+/* ── 테이블 ── */
 .admin-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
 }
 .admin-table th {
   text-align: left;
-  padding: 10px 12px;
+  padding: 8px 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--color-text-secondary);
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: 0.5px solid var(--color-border);
 }
 .admin-table td {
-  padding: 10px 12px;
+  padding: 10px;
   font-size: 13px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 0.5px solid var(--color-border);
+  color: var(--color-text);
 }
 .admin-table tbody tr:hover {
   background: var(--color-surface-alt);
 }
 
-/* Document Management */
+/* ── 문서 관리 ── */
 .doc-toolbar {
   display: flex;
   align-items: center;
@@ -877,36 +930,36 @@ body {
 /* Badges & Tags */
 .type-badge {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
 }
-.type-badge.guide { background: #E8F5EE; color: #1A5C33; }
-.type-badge.law { background: #E8F0FB; color: #1B4D8B; }
+.type-badge.guide { background: #EAF3DE; color: #3B6D11; }
+.type-badge.law { background: #E6F1FB; color: #185FA5; }
 .type-badge.policy { background: #FFF3E0; color: #8B5E0B; }
 
 .region-tag {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
 }
-.region-tag.seoul { background: #E8F5EE; color: #1A5C33; }
-.region-tag.cheonan { background: #E8F0FB; color: #1B4D8B; }
+.region-tag.seoul { background: #EAF3DE; color: #3B6D11; }
+.region-tag.cheonan { background: #E6F1FB; color: #185FA5; }
 .region-tag.busan { background: #FFF3E0; color: #8B5E0B; }
-.region-tag.common { background: #F0F0EC; color: #5A5A55; }
+.region-tag.common { background: var(--color-surface-alt); color: var(--color-text-secondary); }
 
 .vector-status {
   font-size: 11px;
   font-weight: 500;
 }
-.vector-status.done { color: var(--color-green); }
+.vector-status.done { color: #3B6D11; }
 .vector-status.pending { color: var(--color-amber); }
 
 .status-active {
-  color: var(--color-green);
+  color: #3B6D11;
   font-size: 12px;
   font-weight: 500;
 }
@@ -946,7 +999,7 @@ body {
 }
 .top-question-item:last-child { border-bottom: none; }
 .top-question-rank {
-  color: var(--color-green);
+  color: #3B6D11;
   font-weight: 600;
   font-size: 13px;
   min-width: 18px;
@@ -983,7 +1036,7 @@ body {
 }
 .daily-bar {
   width: 100%;
-  background: var(--color-green);
+  background: #3B6D11;
   border-radius: 3px 3px 0 0;
   min-height: 4px;
 }
@@ -1011,7 +1064,7 @@ body {
   background: var(--color-text-muted);
 }
 .index-dot.active {
-  background: var(--color-green);
+  background: #3B6D11;
 }
 
 /* ===== Landing Page ===== */
@@ -1553,7 +1606,7 @@ body {
   margin-top: 24px;
 }
 .upload-area {
-  border: 2px dashed var(--color-border);
+  border: 1.5px dashed var(--color-border);
   border-radius: var(--radius-lg);
   padding: 32px;
   text-align: center;
@@ -1563,8 +1616,8 @@ body {
 }
 .upload-area:hover,
 .upload-area.drag-over {
-  border-color: var(--color-green);
-  background: #F0FAF4;
+  border-color: #3B6D11;
+  background: #F6FAF0;
 }
 .upload-icon {
   margin-bottom: 12px;
@@ -1572,7 +1625,7 @@ body {
 }
 .upload-area:hover .upload-icon,
 .upload-area.drag-over .upload-icon {
-  color: var(--color-green);
+  color: #3B6D11;
 }
 .upload-text {
   font-size: 14px;
@@ -1599,7 +1652,7 @@ body {
 }
 .upload-progress-bar {
   height: 4px;
-  background: var(--color-green);
+  background: #3B6D11;
   border-radius: 2px;
   transition: width 0.3s ease;
   width: 0;
@@ -2109,6 +2162,7 @@ body {
 .md-empty { font-size: 13px; color: #9CA3AF; text-align: center; padding: 24px 0; }
 .md-btn-danger { color: #DC2626 !important; border-color: #FCA5A5 !important; }
 .md-btn-danger:hover { background: #FEF2F2 !important; }
+.md-rule-badge { display:inline-block; padding:2px 8px; border-radius:4px; background:#E8F5E9; color:#2E7D32; font-size:12px; font-weight:600; }
 
 .form-errors-top {
   background: #FEF2F2; border: 1px solid #FECACA;
