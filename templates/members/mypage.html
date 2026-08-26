@@ -29,7 +29,9 @@
     <!-- 탭 -->
     <div class="mp-tabs" id="mp-tabs">
       <button class="mp-tab active" data-tab="info">내 정보</button>
+      {% if not user.is_service_admin %}
       <button class="mp-tab" data-tab="apt">내 단지</button>
+      {% endif %}
       <button class="mp-tab" data-tab="activity">활동 내역</button>
       <button class="mp-tab" data-tab="settings">설정</button>
     </div>
@@ -70,6 +72,7 @@
     </div>
 
     <!-- ═══ 내 단지 탭 ═══ -->
+    {% if not user.is_service_admin %}
     <div class="mp-panel" id="panel-apt">
       {% if active_membership %}
       <div class="mp-apt-current">
@@ -135,6 +138,7 @@
       </div>
       {% endif %}
     </div>
+    {% endif %}
 
     <!-- ═══ 활동 내역 탭 ═══ -->
     <div class="mp-panel" id="panel-activity">
