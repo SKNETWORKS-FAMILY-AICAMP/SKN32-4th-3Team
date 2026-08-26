@@ -2067,6 +2067,13 @@ body {
   color: var(--color-primary-dark);
   font-weight: 600;
 }
+/* 마이페이지 로그아웃 버튼 */
+.mp-logout-btn {
+  background: none; border: none; padding: 0;
+  font-size: inherit; color: #374151;
+  cursor: pointer; font-weight: 500;
+}
+.mp-logout-btn:hover { color: var(--color-primary); text-decoration: underline; }
 .form-errors-top {
   background: #FEF2F2; border: 1px solid #FECACA;
   color: #991B1B; border-radius: 6px;

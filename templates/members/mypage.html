@@ -211,6 +211,10 @@
         <div class="mp-settings-title">계정</div>
         <div class="mp-settings-links">
           <a href="{% url 'members:profile_edit' %}" class="mp-settings-link mp-settings-link-primary">프로필 수정</a>
+          <form method="post" action="{% url 'members:logout' %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" class="mp-settings-link mp-logout-btn">로그아웃</button>
+          </form>
           <a href="{% url 'members:withdraw' %}" class="mp-settings-link mp-text-danger">회원 탈퇴</a>
         </div>
       </div>
