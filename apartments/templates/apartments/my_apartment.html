@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}내 단지 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  {% include 'apartments/_nav.html' %}
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head">
+      <h1>내 단지</h1>
+      <a class="btn btn-outline btn-sm" href="{% url 'apartments:search' %}">단지 더 찾기</a>
+    </div>
+
+    {% if active %}
+      <p>현재 컨텍스트: <strong>{{ active.apartment }}</strong> ({{ active.get_role_display }})</p>
+    {% else %}
+      <p>아직 승인된 단지 소속이 없습니다.</p>
+    {% endif %}
+
+    <table class="admin-table">
+      <thead><tr><th>단지</th><th>역할</th><th>상태</th><th>신청일</th><th></th></tr></thead>
+      <tbody>
+      {% for m in memberships %}
+        <tr>
+          <td>{{ m.apartment }}</td>
+          <td>{{ m.get_role_display }}</td>
+          <td>{{ m.get_status_display }}</td>
+          <td>{{ m.applied_at|date:"Y-m-d" }}</td>
+          <td>
+            {% if m.status == "approved" and m != active %}
+              <form method="post" action="{% url 'apartments:switch' m.apartment_id %}" style="display:inline">
+                {% csrf_token %}<button class="btn btn-outline btn-sm" type="submit">전환</button>
+              </form>
+            {% endif %}
+            {% if m.status == "approved" %}
+              <form method="post" action="{% url 'apartments:membership_leave' m.pk %}" style="display:inline"
+                    onsubmit="return confirm('정말 이 단지 소속을 해지할까요?');">
+                {% csrf_token %}<button class="btn btn-outline btn-sm" type="submit">나가기</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">소속된 단지가 없습니다.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="docs-head" style="margin-top:24px">
+      <h2 style="font-size:16px">바로가기</h2>
+    </div>
+    <p>
+      {% if active %}<a class="btn btn-outline btn-sm" href="{% url 'apartments:rule_list' %}">단지 규정 보기</a>{% endif %}
+      {% if is_manager_anywhere or request.user.is_service_admin %}
+        <a class="btn btn-outline btn-sm" href="{% url 'apartments:resident_queue' %}">
+          입주민 승인 큐{% if pending_resident_count %} ({{ pending_resident_count }}건 대기){% endif %}
+        </a>
+        <a class="btn btn-outline btn-sm" href="{% url 'apartments:resident_roster' %}">입주민 명단</a>
+      {% endif %}
+      {% if request.user.is_service_admin %}
+        <a class="btn btn-outline btn-sm" href="{% url 'apartments:membership_queue' %}">
+          관리자 승인 큐{% if pending_membership_count %} ({{ pending_membership_count }}건 대기){% endif %}
+        </a>
+        <a class="btn btn-outline btn-sm" href="{% url 'apartments:manager_roster' %}">관리사무소 관리자 명단</a>
+      {% endif %}
+    </p>
+  </div>
+</div>
+{% endblock %}

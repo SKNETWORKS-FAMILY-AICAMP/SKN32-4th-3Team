@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}관리사무소 관리자 신청 - Ecobot{% endblock %}
+{% block content %}
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-logo"><div class="logo-icon">🗂️</div><h1>관리사무소 관리자 신청</h1>
+      <p class="login-subtitle">서비스 운영자 승인 후 이용할 수 있습니다</p></div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_apartment">단지</label>
+        <select name="apartment" id="id_apartment" class="region-dropdown" required>
+          {% for apt in form.fields.apartment.queryset %}
+            <option value="{{ apt.pk }}" {% if form.apartment.value|stringformat:"s" == apt.pk|stringformat:"s" %}selected{% endif %}>{{ apt }}</option>
+          {% endfor %}
+        </select>
+        {% for e in form.apartment.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-group">
+        <label for="id_decision_note">위탁관리 근거(계약서 번호 등, 선택)</label>
+        <textarea name="decision_note" id="id_decision_note" rows="3">{{ form.decision_note.value|default:'' }}</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">신청하기</button>
+    </form>
+    <p class="login-link"><a href="{% url 'apartments:search' %}">← 단지 다시 찾기</a></p>
+  </div>
+</div>
+{% endblock %}

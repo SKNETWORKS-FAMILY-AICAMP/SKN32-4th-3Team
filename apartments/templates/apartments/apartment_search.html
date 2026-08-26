@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}단지 찾기 - Ecobot{% endblock %}
+{% block content %}
+<div class="guide-layout">
+  {% include 'apartments/_nav.html' %}
+  <div class="docs-wrap">
+    {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+    <div class="docs-head">
+      <h1>단지 찾기</h1>
+      <span style="color:#888;font-size:13px">지역을 먼저 고르면 그 지역 단지만 검색됩니다.</span>
+    </div>
+    <form method="get" class="board-filter">
+      <select name="region" class="region-dropdown">
+        {% for code, label in form.fields.region.choices %}
+          <option value="{{ code }}" {% if form.region.value == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="q" value="{{ form.q.value|default:'' }}" placeholder="단지명 검색">
+      <button type="submit" class="btn btn-outline btn-sm">검색</button>
+    </form>
+    <table class="admin-table">
+      <thead><tr><th>단지명</th><th>지역</th><th>주소</th><th></th></tr></thead>
+      <tbody>
+      {% for apt in apartments %}
+        <tr>
+          <td>{{ apt.name }}</td>
+          <td>{{ apt.get_region_display }}</td>
+          <td>{{ apt.address }}</td>
+          <td>
+            <a class="btn btn-primary btn-sm" href="{% url 'apartments:join' %}?apartment={{ apt.pk }}">입주민으로 신청</a>
+            <a class="btn btn-outline btn-sm" href="{% url 'apartments:manager_apply' %}?apartment={{ apt.pk }}">관리자 신청</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">검색 결과가 없습니다. 관리사무소에 단지 등록을 문의해 주세요.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

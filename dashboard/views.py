@@ -92,7 +92,47 @@ class DashboardView(AdminRequiredMixin, View):
     """
 
     def get(self, request):
-        return render(request, "dashboard/index.html")
+        from apartments.models import Apartment, ApartmentRule, Membership
+
+        # 관리사무소 관리자 승인 대기
+        pending_managers = Membership.objects.filter(
+            role=Membership.Role.MANAGER, status=Membership.Status.REQUESTED,
+        ).select_related("member", "apartment").order_by("-applied_at")
+
+        # 단지별 현황
+        apartments = Apartment.objects.all().order_by("region", "name")
+        apt_data = []
+        for apt in apartments:
+            resident_count = Membership.objects.filter(
+                apartment=apt, role=Membership.Role.RESIDENT,
+                status=Membership.Status.APPROVED,
+            ).count()
+            manager_count = Membership.objects.filter(
+                apartment=apt, role=Membership.Role.MANAGER,
+                status=Membership.Status.APPROVED,
+            ).count()
+            rule_count = ApartmentRule.objects.filter(apartment=apt).count()
+            apt_data.append({
+                "apartment": apt,
+                "resident_count": resident_count,
+                "manager_count": manager_count,
+                "rule_count": rule_count,
+            })
+
+        total_residents = sum(a["resident_count"] for a in apt_data)
+        total_rules = sum(a["rule_count"] for a in apt_data)
+
+        return render(
+            request, "dashboard/index.html",
+            {
+                "pending_managers": pending_managers,
+                "pending_manager_count": pending_managers.count(),
+                "apt_data": apt_data,
+                "apt_count": len(apt_data),
+                "total_residents": total_residents,
+                "total_rules": total_rules,
+            },
+        )
 
 
 class StatsAPIView(AdminRequiredMixin, View):
@@ -262,7 +302,7 @@ class DocumentsAPIView(AdminRequiredMixin, View):
                         chunk_count, region_label, type_label}, ...]}
     """
 
-    TYPE_LABELS = {"guide": "가이드", "law": "법령", "manual": "사용자 문서"}
+    TYPE_LABELS = {"guide": "가이드", "law": "법령", "manual": "사용자 문서", "apartment": "단지 규정"}
 
     def get(self, request):
         import json

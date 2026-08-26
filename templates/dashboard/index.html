@@ -2,94 +2,161 @@
 {% load static %}
 {% block title %}관리자 대시보드 - Ecobot{% endblock %}
 {% block content %}
-{# 3차 index.html 의 admin-page 섹션 이식본. 렌더링은 dashboard.js. #}
 <div class="admin-layout">
-      <header class="admin-header">
-        <div class="admin-header-left">
-          <a class="btn-icon" href="{% url 'chat:room' %}" title="채팅으로 돌아가기" style="text-decoration:none">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          </a>
-          <span class="logo-icon-sm">🌿</span>
-          <h2>Ecobot 관리자</h2>
-        </div>
-        <div class="admin-tabs">
-          <button class="admin-tab active" data-tab="stats" onclick="switchAdminTab('stats')">질문 통계</button>
-          <button class="admin-tab" data-tab="documents" onclick="switchAdminTab('documents')">문서 관리</button>
-        </div>
-      </header>
+  <header class="admin-header">
+    <div class="admin-header-left">
+      <a class="btn-icon" href="{% url 'chat:room' %}" title="채팅으로 돌아가기" style="text-decoration:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </a>
+      <span class="logo-icon-sm">🌿</span>
+      <h2>Ecobot 관리자</h2>
+    </div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-tab="stats" onclick="switchAdminTab('stats')">질문 통계</button>
+      <button class="admin-tab" data-tab="apartments" onclick="switchAdminTab('apartments')">
+        단지 관리{% if pending_manager_count %} <span class="ad-tab-badge">{{ pending_manager_count }}</span>{% endif %}
+      </button>
+      <button class="admin-tab" data-tab="documents" onclick="switchAdminTab('documents')">문서 관리</button>
+    </div>
+  </header>
 
-      <!-- 질문 통계 탭 -->
-      <div class="admin-content" id="tab-stats">
-        <div class="stats-grid" id="stats-cards">
-          <div class="stat-card"><p class="stat-label">총 질문 수</p><p class="stat-value green" id="stat-total">-</p><p class="stat-change" id="stat-week-change"></p></div>
-          <div class="stat-card"><p class="stat-label">오늘 질문</p><p class="stat-value" id="stat-today">-</p><p class="stat-change" id="stat-today-diff"></p></div>
-          <div class="stat-card"><p class="stat-label">활성 사용자</p><p class="stat-value amber" id="stat-users">-</p><p class="stat-change">이번 주</p></div>
-          <div class="stat-card"><p class="stat-label">답변 성공률</p><p class="stat-value green" id="stat-success">-</p><p class="stat-change">근거 기반</p></div>
-        </div>
+  <!-- ═══ 탭 1: 질문 통계 ═══ -->
+  <div class="admin-content" id="tab-stats">
+    <div class="stats-grid" id="stats-cards">
+      <div class="stat-card"><p class="stat-label">총 질문 수</p><p class="stat-value green" id="stat-total">-</p><p class="stat-change" id="stat-week-change"></p></div>
+      <div class="stat-card"><p class="stat-label">오늘 질문</p><p class="stat-value" id="stat-today">-</p><p class="stat-change" id="stat-today-diff"></p></div>
+      <div class="stat-card"><p class="stat-label">활성 사용자</p><p class="stat-value amber" id="stat-users">-</p><p class="stat-change">이번 주</p></div>
+      <div class="stat-card"><p class="stat-label">답변 성공률</p><p class="stat-value green" id="stat-success">-</p><p class="stat-change">근거 기반</p></div>
+    </div>
 
-        <div class="stats-columns">
-          <!-- 지역별 질문 분포 -->
-          <div class="stats-section">
-            <h3>지역별 질문 분포</h3>
-            <div class="region-stats" id="region-stats-container">
-              <p class="stat-placeholder">데이터 로딩 중...</p>
-            </div>
-          </div>
-
-          <!-- 인기 질문 TOP 5 -->
-          <div class="stats-section">
-            <h3>인기 질문 TOP 5</h3>
-            <div id="top-questions-container">
-              <p class="stat-placeholder">데이터 로딩 중...</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 일별 추이 -->
-        <div class="stats-section">
-          <h3>최근 7일 질문 추이</h3>
-          <div class="daily-chart" id="daily-chart-container">
-            <p class="stat-placeholder">데이터 로딩 중...</p>
-          </div>
+    <div class="stats-columns">
+      <div class="stats-section">
+        <h3>지역별 질문 분포</h3>
+        <div class="region-stats" id="region-stats-container">
+          <p class="stat-placeholder">데이터 로딩 중...</p>
         </div>
       </div>
-
-      <!-- 문서 관리 탭 -->
-      <div class="admin-content hidden" id="tab-documents">
-        <div class="doc-toolbar">
-          <div class="index-status" id="index-status">
-            <span class="index-dot"></span>
-            <span>인덱스 상태 확인 중...</span>
-          </div>
-          <button class="btn btn-sm" onclick="rebuildIndex()">🔄 인덱스 재빌드</button>
-        </div>
-        <table class="admin-table" id="doc-table">
-          <thead>
-            <tr><th>문서명</th><th>유형</th><th>지역</th><th>청크</th></tr>
-          </thead>
-          <tbody id="doc-table-body">
-            <tr><td colspan="4" class="stat-placeholder">데이터 로딩 중...</td></tr>
-          </tbody>
-        </table>
-
-        <!-- 새 문서 업로드 -->
-        <div class="upload-section">
-          <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-            <div class="upload-icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            </div>
-            <p class="upload-text">새 문서 업로드 (.txt, .md, .pdf)</p>
-            <p class="upload-hint">클릭하거나 파일을 드래그하세요</p>
-          </div>
-          <input type="file" id="file-input" accept=".txt,.md,.pdf" style="display:none" onchange="handleFileUpload(this)">
-          <div class="upload-progress hidden" id="upload-progress">
-            <div class="upload-progress-bar" id="upload-progress-bar"></div>
-            <span class="upload-progress-text" id="upload-progress-text">업로드 중...</span>
-          </div>
+      <div class="stats-section">
+        <h3>인기 질문 TOP 5</h3>
+        <div id="top-questions-container">
+          <p class="stat-placeholder">데이터 로딩 중...</p>
         </div>
       </div>
     </div>
-  
+
+    <div class="stats-section">
+      <h3>최근 7일 질문 추이</h3>
+      <div class="daily-chart" id="daily-chart-container">
+        <p class="stat-placeholder">데이터 로딩 중...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 탭 2: 단지 관리 ═══ -->
+  <div class="admin-content hidden" id="tab-apartments">
+    <div class="stats-grid">
+      <div class="stat-card"><p class="stat-label">등록 단지</p><p class="stat-value">{{ apt_count }}</p></div>
+      <div class="stat-card"><p class="stat-label">전체 입주민</p><p class="stat-value">{{ total_residents }}</p></div>
+      <div class="stat-card"><p class="stat-label">관리자 승인 대기</p><p class="stat-value {% if pending_manager_count %}red{% endif %}">{{ pending_manager_count }}</p></div>
+      <div class="stat-card"><p class="stat-label">등록된 규정</p><p class="stat-value">{{ total_rules }}</p></div>
+    </div>
+
+    {% if pending_managers %}
+    <div class="ad-plain-section">
+      <h3 class="ad-section-title">관리사무소 관리자 승인 대기</h3>
+      <table class="admin-table">
+        <thead>
+          <tr><th>신청자</th><th>단지</th><th>신청일</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for m in pending_managers %}
+          <tr>
+            <td>{{ m.member.display_name }} ({{ m.member.nickname }})</td>
+            <td><span style="font-weight:500">{{ m.apartment.name }}</span> <span class="ad-region-tag">{{ m.apartment.get_region_display }}</span></td>
+            <td>{{ m.applied_at|date:"Y.m.d" }}</td>
+            <td style="text-align:right">
+              <form method="post" action="{% url 'apartments:membership_decide' m.pk %}" style="display:inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="approve">
+                <button type="submit" class="btn btn-outline btn-sm">승인</button>
+              </form>
+              <form method="post" action="{% url 'apartments:membership_decide' m.pk %}" style="display:inline;margin-left:4px">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reject">
+                <button type="submit" class="btn btn-outline btn-sm" style="color:#A32D2D;border-color:#F7C1C1">거절</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <div class="ad-plain-section">
+      <h3 class="ad-section-title">단지별 현황</h3>
+      <table class="admin-table">
+        <thead>
+          <tr><th>단지명</th><th>지역</th><th>입주민</th><th>관리자</th><th>규정</th></tr>
+        </thead>
+        <tbody>
+          {% for item in apt_data %}
+          <tr>
+            <td style="font-weight:500">{{ item.apartment.name }}</td>
+            <td><span class="ad-region-tag">{{ item.apartment.get_region_display }}</span></td>
+            <td>{{ item.resident_count }}명</td>
+            <td>{{ item.manager_count }}명</td>
+            <td>{{ item.rule_count }}건</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="stat-placeholder">등록된 단지가 없습니다.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ 탭 3: 문서 관리 ═══ -->
+  <div class="admin-content hidden" id="tab-documents">
+    <div class="stats-grid" id="doc-stats-cards">
+      <div class="stat-card"><p class="stat-label">전체 문서</p><p class="stat-value" id="doc-stat-total">-</p></div>
+      <div class="stat-card"><p class="stat-label">법령</p><p class="stat-value" id="doc-stat-law">-</p></div>
+      <div class="stat-card"><p class="stat-label">가이드</p><p class="stat-value" id="doc-stat-guide">-</p></div>
+      <div class="stat-card"><p class="stat-label">단지 규정</p><p class="stat-value" id="doc-stat-apartment">-</p></div>
+    </div>
+
+    <div class="doc-toolbar">
+      <div class="index-status" id="index-status">
+        <span class="index-dot"></span>
+        <span>인덱스 상태 확인 중...</span>
+      </div>
+      <button class="btn btn-sm" onclick="rebuildIndex()">🔄 인덱스 재빌드</button>
+    </div>
+    <table class="admin-table" id="doc-table">
+      <thead>
+        <tr><th>문서명</th><th>유형</th><th>지역</th><th>청크</th></tr>
+      </thead>
+      <tbody id="doc-table-body">
+        <tr><td colspan="4" class="stat-placeholder">데이터 로딩 중...</td></tr>
+      </tbody>
+    </table>
+
+    <div class="upload-section">
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <p class="upload-text">새 문서 업로드 (.txt, .md, .pdf)</p>
+        <p class="upload-hint">클릭하거나 파일을 드래그하세요</p>
+      </div>
+      <input type="file" id="file-input" accept=".txt,.md,.pdf" style="display:none" onchange="handleFileUpload(this)">
+      <div class="upload-progress hidden" id="upload-progress">
+        <div class="upload-progress-bar" id="upload-progress-bar"></div>
+        <span class="upload-progress-text" id="upload-progress-text">업로드 중...</span>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script id="dashboard-config" type="application/json">
 {

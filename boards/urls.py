@@ -10,4 +10,8 @@ urlpatterns = [
     path("<int:pk>/", views.BoardDetailView.as_view(), name="detail"),
     path("<int:pk>/update/", views.BoardUpdateView.as_view(), name="update"),
     path("<int:pk>/delete/", views.BoardDeleteView.as_view(), name="delete"),
+    path("<int:pk>/hide/", views.BoardHideView.as_view(), name="hide"),
+    path("<int:pk>/like/", views.BoardLikeView.as_view(), name="like"),
+    path("<int:pk>/comment/", views.CommentCreateView.as_view(), name="comment_create"),
+    path("<int:pk>/comment/<int:comment_pk>/delete/", views.CommentDeleteView.as_view(), name="comment_delete"),
 ]

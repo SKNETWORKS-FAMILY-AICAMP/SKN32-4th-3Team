@@ -1,6 +1,6 @@
-# 5분 실행용 최소 의존성 (MySQL · API 키 · torch 불필요)
-#   DB_ENGINE=sqlite3  EMBEDDING_BACKEND=hash  RAG_SOURCE=files 조합 전용.
-# 전체 기능(local/openai 임베딩, LangChain 경로, MySQL)은 requirements.txt 사용.
+# Minimal deps for a 5-minute run (no MySQL / API key / torch needed)
+#   Only for the DB_ENGINE=sqlite3  EMBEDDING_BACKEND=hash  RAG_SOURCE=files combo.
+# For full features (local/openai embeddings, LangChain path, MySQL) use requirements.txt.
 Django>=5.0,<6.0
 python-dotenv
 Pillow

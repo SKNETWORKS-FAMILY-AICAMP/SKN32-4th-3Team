@@ -18,21 +18,27 @@ CBV 를 붙여넣는 자리로 남겨뒀습니다.
 from django.contrib.auth import login, logout
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.shortcuts import redirect, render
 from django.views import View
 
 from .forms import LoginForm, ProfileForm, SignUpForm
 
+from apartments import scope as apt_scope
+from apartments.models import Membership
+
 
 class HomeView(View):
     """랜딩 화면. 로그인 여부와 무관하게 접근 가능합니다.
 
-    프론트 이식 단계에서 3차 static/index.html 의 landing-page 섹션으로
-    교체합니다. 지금은 동작하는 화면으로 안내하는 자리표시자입니다.
+    로그인 상태에서는 커뮤니티 최근 게시글을 미리보기로 보여줍니다.
     """
 
     def get(self, request):
-        return render(request, "home.html")
+        from boards.models import Board
+
+        recent_boards = Board.objects.select_related("author").order_by("-created_at")[:5]
+        return render(request, "home.html", {"recent_boards": recent_boards})
 
 
 class GuideView(View):
@@ -58,19 +64,63 @@ class GuideView(View):
 
 
 class SignUpView(View):
+    def _apartments_context(self):
+        from apartments.models import Apartment
+
+        return {"apartments": Apartment.objects.all()}
+
     def get(self, request):
         if request.user.is_authenticated:
             return redirect("chat:room")
-        return render(request, "members/signup.html", {"form": SignUpForm()})
+        return render(
+            request, "members/signup.html",
+            {"form": SignUpForm(), **self._apartments_context()},
+        )
 
     def post(self, request):
         if request.user.is_authenticated:
             return redirect("chat:room")
         form = SignUpForm(request.POST)
         if not form.is_valid():
-            return render(request, "members/signup.html", {"form": form}, status=400)
-        member = form.save()
-        login(request, member)  # 가입 직후 자동 로그인 (강사 자료와 동일)
+            return render(
+                request, "members/signup.html",
+                {"form": form, **self._apartments_context()}, status=400,
+            )
+
+        from django.contrib import messages
+
+        from apartments.models import Membership
+        from apartments.services import ServiceAdminCannotApplyError, apply_for_membership
+
+        # design 변경: 서비스 총괄 관리자(is_staff/is_superuser)는 이미
+        # 모든 단지를 관리할 수 있으므로 "관리사무소 관리자로 신청"이
+        # 자동으로 접수되면 안 된다(apply_for_membership 이 막는다). 지금
+        # 회원가입은 항상 is_staff=False 인 새 계정만 만들어서 사실상
+        # 걸릴 일이 없지만, 걸리더라도 트랜잭션 전체가 롤백돼 가입 자체가
+        # 실패하면 안 되므로 이 부분만 따로 감싼다.
+        apartment_apply_blocked = False
+        with transaction.atomic():
+            member = form.save()
+            apartment = form.cleaned_data.get("apartment")
+            if apartment:
+                try:
+                    apply_for_membership(
+                        member, apartment, form.cleaned_data["member_type"],
+                        form.cleaned_data.get("decision_note", ""),
+                    )
+                except ServiceAdminCannotApplyError:
+                    apartment_apply_blocked = True
+
+        login(request, member)
+        if apartment_apply_blocked:
+            messages.info(request, "가입이 완료됐습니다. 서비스 총괄 관리자 계정은 별도 단지 관리자 신청이 필요하지 않습니다.")
+        elif form.cleaned_data.get("apartment"):
+            role_label = dict(Membership.Role.choices)[form.cleaned_data["member_type"]]
+            messages.success(
+                request,
+                f"가입이 완료됐습니다. '{apartment.name}' {role_label} 신청이 접수되어 승인을 기다리는 중이에요 "
+                "— 승인 전에도 챗봇에서 단지 규정을 바로 물어볼 수 있어요.",
+            )
         return redirect("chat:room")
 
 
@@ -111,7 +161,49 @@ class ProfileUpdateView(LoginRequiredMixin, View):
                 request, "members/profile_form.html", {"form": form}, status=400
             )
         form.save()
-        return redirect("members:profile")
+        return redirect("members:mypage")
+
+
+class MyPageView(LoginRequiredMixin, View):
+    """마이페이지 — 프로필·내 단지·활동 내역·설정을 탭으로 통합."""
+
+    def get(self, request):
+        from boards.models import Board, BoardLike, Comment
+
+        user = request.user
+        memberships = Membership.objects.filter(member=user).select_related("apartment").order_by("-applied_at")
+        active_membership = apt_scope.current_membership(request)
+
+        # 활동 내역 통계
+        board_count = Board.objects.filter(author=user).count()
+        comment_count = Comment.objects.filter(author=user).count()
+        like_count = BoardLike.objects.filter(user=user).count()
+
+        # 최근 작성 글
+        recent_boards = Board.objects.filter(author=user).order_by("-created_at")[:5]
+        # 최근 댓글
+        recent_comments = Comment.objects.filter(author=user).select_related("board").order_by("-created_at")[:5]
+        # 좋아요한 글
+        liked_boards = Board.objects.filter(likes__user=user).order_by("-likes__created_at")[:5]
+
+        # 중간관리자 여부
+        is_manager = (
+            active_membership is not None
+            and active_membership.role == Membership.Role.MANAGER
+        )
+
+        return render(request, "members/mypage.html", {
+            "memberships": memberships,
+            "active_membership": active_membership,
+            "is_manager": is_manager,
+            "board_count": board_count,
+            "comment_count": comment_count,
+            "like_count": like_count,
+            "recent_boards": recent_boards,
+            "recent_comments": recent_comments,
+            "liked_boards": liked_boards,
+            "profile_form": ProfileForm(instance=user),
+        })
 
 
 class WithdrawView(LoginRequiredMixin, View):

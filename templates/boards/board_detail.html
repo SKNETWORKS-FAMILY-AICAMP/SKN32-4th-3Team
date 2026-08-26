@@ -7,32 +7,162 @@
       <span class="land-logo-icon">🌿</span><strong class="land-logo-text">Ecobot</strong>
     </a>
     <div class="land-nav-right">
-      <a class="btn btn-outline btn-sm" href="{% url 'boards:list' %}">← 목록</a>
-      {% if user.is_authenticated and board.author_id == user.id %}
-        <a class="btn btn-outline btn-sm" href="{% url 'boards:update' board.pk %}">수정</a>
-        <form method="post" action="{% url 'boards:delete' board.pk %}" style="display:inline"
-              onsubmit="return confirm('이 글을 삭제할까요?')">
-          {% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">삭제</button>
-        </form>
-      {% endif %}
+      <a class="btn btn-outline btn-sm" href="{% url 'boards:list' %}" style="text-decoration:none;">← 목록</a>
     </div>
   </nav>
-  <div class="docs-wrap">
+  <div class="board-wrap">
     {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
-    <div class="docs-head">
-      <h1>{{ board.title }}</h1>
+
+    <!-- 게시글 헤더 -->
+    <div class="detail-header">
+      <div class="community-card-badges">
+        {% if board.is_hidden %}<span class="badge badge-hidden">비공개</span>{% endif %}
+        {% if board.category == 'question' %}<span class="badge badge-question">질문</span>
+        {% elif board.category == 'info' %}<span class="badge badge-info">정보공유</span>
+        {% elif board.category == 'review' %}<span class="badge badge-review">후기</span>
+        {% elif board.category == 'free' %}<span class="badge badge-free">자유</span>
+        {% else %}<span class="badge badge-info">{{ board.get_category_display }}</span>
+        {% endif %}
+      </div>
+      <h1 class="detail-title">{{ board.title }}</h1>
+      <div class="detail-meta">
+        <div class="community-card-author">
+          <span class="community-avatar">{{ board.author.community_name|first }}</span>
+          <span class="community-author-name">{{ board.author.community_name }}</span>
+          <span style="font-size:12px; color:var(--color-text-muted); margin-left:4px;">
+            {{ board.created_at|date:"Y.m.d H:i" }} · 조회 {{ board.read_count }}
+            {% if board.updated_at|date:"YmdHi" != board.created_at|date:"YmdHi" %} · <em>수정됨</em>{% endif %}
+          </span>
+        </div>
+        {% if can_delete or is_manager %}
+        <div class="detail-more-wrap" style="position:relative;">
+          <button class="detail-more-btn" onclick="document.getElementById('more-menu').classList.toggle('show')"
+                  style="background:none; border:none; cursor:pointer; font-size:20px; padding:4px 8px; color:var(--color-text-secondary); border-radius:var(--radius);">
+            ⋮
+          </button>
+          <div id="more-menu" class="detail-more-menu">
+            {% if board.author_id == user.id %}
+            <a href="{% url 'boards:update' board.pk %}" class="detail-more-item">✏️ 수정</a>
+            {% endif %}
+            {% if can_delete %}
+            <form method="post" action="{% url 'boards:delete' board.pk %}" style="margin:0;"
+                  onsubmit="return confirm('이 글을 삭제할까요?')">
+              {% csrf_token %}
+              <button type="submit" class="detail-more-item detail-more-danger">🗑️ 삭제</button>
+            </form>
+            {% endif %}
+            {% if is_manager %}
+            <form method="post" action="{% url 'boards:hide' board.pk %}" style="margin:0;">
+              {% csrf_token %}
+              <button type="submit" class="detail-more-item">
+                {% if board.is_hidden %}👁 공개 처리{% else %}🔒 비공개 처리{% endif %}
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
     </div>
-    <p class="board-meta">
-      {{ board.author.display_name }} · {{ board.get_region_display }} ·
-      {{ board.created_at|date:"Y.m.d H:i" }} · 조회 {{ board.read_count }}
-      {% if board.updated_at|date:"YmdHi" != board.created_at|date:"YmdHi" %}
-        · <em>{{ board.updated_at|date:"Y.m.d H:i" }} 수정됨</em>
-      {% endif %}
-    </p>
+
     {% if board.attachment %}
       <p class="board-attach">📎 <a href="{{ board.attachment.url }}" download>첨부파일 내려받기</a></p>
     {% endif %}
-    <pre class="doc-pre">{{ board.content }}</pre>
+
+    <!-- 본문 -->
+    <div class="detail-content">
+      {{ board.content|linebreaksbr }}
+    </div>
+
+    <!-- 좋아요 버튼 -->
+    {% if user.is_authenticated %}
+    <div class="detail-actions">
+      <button class="like-btn {% if user_liked %}liked{% endif %}" id="like-btn"
+              onclick="toggleLike({{ board.pk }})">
+        <span id="like-icon">{% if user_liked %}♥{% else %}♡{% endif %}</span>
+        <span id="like-text">좋아요</span>
+        <span id="like-count">{{ board.like_count }}</span>
+      </button>
+    </div>
+    {% else %}
+    <div class="detail-actions">
+      <a href="{% url 'members:login' %}?next={{ request.path }}" class="like-btn">♡ 좋아요 {{ board.like_count }}</a>
+    </div>
+    {% endif %}
+
+    <!-- 댓글 섹션 -->
+    <div class="comment-section">
+      <h3 class="comment-title">💬 댓글 {{ board.comment_count }}개</h3>
+
+      {% if user.is_authenticated %}
+      <form method="post" action="{% url 'boards:comment_create' board.pk %}" class="comment-form">
+        {% csrf_token %}
+        <div class="comment-input-wrap">
+          <span class="community-avatar">{{ user.community_name|first }}</span>
+          <textarea name="content" rows="2" placeholder="댓글을 입력하세요..." required class="comment-textarea"></textarea>
+        </div>
+        <div class="comment-form-actions">
+          <button type="submit" class="btn btn-primary btn-sm">댓글 작성</button>
+        </div>
+      </form>
+      {% else %}
+      <div class="comment-login-prompt">
+        <a href="{% url 'members:login' %}?next={{ request.path }}">로그인</a>하면 댓글을 작성할 수 있어요.
+      </div>
+      {% endif %}
+
+      <div class="comment-list">
+        {% for comment in comments %}
+        <div class="comment-item">
+          <div class="comment-item-header">
+            <div class="community-card-author">
+              <span class="community-avatar">{{ comment.author.community_name|first }}</span>
+              <span class="community-author-name">{{ comment.author.community_name }}</span>
+              <span class="community-card-date">{{ comment.created_at|timesince }} 전</span>
+            </div>
+            {% if user.is_authenticated and comment.author_id == user.id or is_manager %}
+            <form method="post" action="{% url 'boards:comment_delete' board.pk comment.pk %}"
+                  onsubmit="return confirm('댓글을 삭제할까요?')" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="comment-delete-btn">삭제</button>
+            </form>
+            {% endif %}
+          </div>
+          <p class="comment-body">{{ comment.content|linebreaksbr }}</p>
+        </div>
+        {% empty %}
+        <p class="comment-empty">아직 댓글이 없습니다.</p>
+        {% endfor %}
+      </div>
+    </div>
   </div>
 </div>
+
+<script>
+function toggleLike(boardPk) {
+  fetch(`/boards/${boardPk}/like/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('like-icon').textContent = data.liked ? '♥' : '♡';
+    document.getElementById('like-count').textContent = data.like_count;
+    const btn = document.getElementById('like-btn');
+    if (data.liked) btn.classList.add('liked');
+    else btn.classList.remove('liked');
+  });
+}
+// 메뉴 바깥 클릭 시 닫기
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('more-menu');
+  const btn = document.querySelector('.detail-more-btn');
+  if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+    menu.classList.remove('show');
+  }
+});
+</script>
 {% endblock %}

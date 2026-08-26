@@ -1,0 +1,533 @@
+"""단지 검색 · 가입 · 관리자 신청 · 승인 큐 · 규정 제안/검토 View."""
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import Http404, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views import View
+
+from dashboard.views import AdminRequiredMixin
+from members.models import REGION_CHOICES
+
+from . import permissions, scope, services
+from .forms import (
+    ApartmentJoinForm,
+    ApartmentOfficeForm,
+    ApartmentRuleForm,
+    ApartmentSearchForm,
+    ManagerApplyForm,
+)
+from .models import Apartment, ApartmentRule, Membership
+
+
+class ApartmentManagerRequiredMixin(LoginRequiredMixin):
+    """apartments 스코프 전용 권한 검사. dashboard.AdminRequiredMixin(is_staff
+    기반, 서비스 전역)과는 별개다 — is_staff 로 단지 관리자를 표현하면
+    안 된다는 설계 문서의 경고를 지키기 위해 새로 둔다."""
+
+    def dispatch(self, request, *args, **kwargs):
+        resp = super().dispatch(request, *args, **kwargs)
+        return resp
+
+    def check_apartment_id(self, request, apartment_id):
+        if not permissions.can_review_rule(request.user, apartment_id):
+            raise Http404("접근 권한이 없습니다.")
+
+
+class ApartmentSearchView(LoginRequiredMixin, View):
+    """지역 → 단지 계단식 검색. 가입·관리자 신청 두 경로의 공용 진입점."""
+
+    def get(self, request):
+        form = ApartmentSearchForm(request.GET or {"region": request.user.region})
+        apartments = Apartment.objects.none()
+        if form.is_valid():
+            qs = Apartment.objects.filter(region=form.cleaned_data["region"])
+            q = form.cleaned_data.get("q")
+            if q:
+                qs = qs.filter(name__icontains=q)
+            apartments = qs
+        return render(
+            request, "apartments/apartment_search.html",
+            {"form": form, "apartments": apartments},
+        )
+
+
+class ApartmentJoinView(LoginRequiredMixin, View):
+    """입주민 가입 신청. design 변경(2R-1) — 코드 자기인증을 없애고
+    항상 requested 로 접수한다. 그 단지 관리사무소 관리자(승인된
+    Membership 이 아직 없으면 서비스 운영자)가 검토해 승인해야 한다 —
+    ManagerApplyView 와 완전히 같은 패턴이고, 승인 시점 처리는
+    MembershipDecisionView 에 있다."""
+
+    def get(self, request):
+        initial = {}
+        apartment_id = request.GET.get("apartment")
+        if apartment_id:
+            initial["apartment"] = apartment_id
+        return render(request, "apartments/join.html", {"form": ApartmentJoinForm(initial=initial)})
+
+    def post(self, request):
+        form = ApartmentJoinForm(request.POST)
+        if not form.is_valid():
+            return render(request, "apartments/join.html", {"form": form}, status=400)
+
+        apartment = form.cleaned_data["apartment"]
+        membership, created = services.apply_for_membership(
+            request.user, apartment, Membership.Role.RESIDENT,
+            form.cleaned_data.get("decision_note", ""),
+        )
+        if not created:
+            messages.info(request, f"이미 신청 이력이 있습니다 (상태: {membership.get_status_display()}).")
+        else:
+            messages.success(request, f"'{apartment.name}' 입주민 가입 신청이 접수되었습니다. 관리사무소 관리자 승인 후 이용할 수 있습니다.")
+        return redirect("apartments:mine")
+
+
+class ManagerApplyView(LoginRequiredMixin, View):
+    """관리사무소 관리자 신청. 항상 requested 로 생성되고 서비스 운영자가
+    승인해야 한다 — 첫 관리자든 아니든 승인자가 서비스 운영자 하나뿐이라
+    별도 부트스트랩 분기가 필요 없다."""
+
+    def get(self, request):
+        return render(request, "apartments/manager_apply.html", {"form": ManagerApplyForm()})
+
+    def post(self, request):
+        form = ManagerApplyForm(request.POST)
+        if not form.is_valid():
+            return render(request, "apartments/manager_apply.html", {"form": form}, status=400)
+
+        apartment = form.cleaned_data["apartment"]
+        try:
+            membership, created = services.apply_for_membership(
+                request.user, apartment, Membership.Role.MANAGER,
+                form.cleaned_data.get("decision_note", ""),
+            )
+        except services.ServiceAdminCannotApplyError as exc:
+            messages.warning(request, str(exc))
+            return redirect("apartments:mine")
+        if not created:
+            messages.info(request, f"이미 신청 이력이 있습니다 (상태: {membership.get_status_display()}).")
+        else:
+            messages.success(request, "관리사무소 관리자 신청이 접수되었습니다. 서비스 운영자 승인 후 이용할 수 있습니다.")
+        return redirect("apartments:mine")
+
+
+class ApartmentOfficeInfoView(LoginRequiredMixin, View):
+    """관리사무소 연락처(주소·전화번호·운영시간) 등록/수정. 여기서 채운
+    값은 (1) 프로필/내단지 화면, (2) 챗봇이 근거를 못 찾았을 때 안내
+    문구(rag/service.py:ask()) 양쪽에 쓰인다."""
+
+    def get(self, request):
+        apartment = scope.current_apartment(request)
+        if not apartment or not permissions.can_manage_apartment(request.user, apartment.pk):
+            raise Http404("접근 권한이 없습니다.")
+        return render(
+            request, "apartments/office_form.html",
+            {"form": ApartmentOfficeForm(instance=apartment), "apartment": apartment},
+        )
+
+    def post(self, request):
+        apartment = scope.current_apartment(request)
+        if not apartment or not permissions.can_manage_apartment(request.user, apartment.pk):
+            raise Http404("접근 권한이 없습니다.")
+        form = ApartmentOfficeForm(request.POST, instance=apartment)
+        if not form.is_valid():
+            return render(
+                request, "apartments/office_form.html",
+                {"form": form, "apartment": apartment}, status=400,
+            )
+        form.save()
+        messages.success(request, "관리사무소 정보가 저장되었습니다.")
+        return redirect("apartments:mine")
+
+
+class MyApartmentView(LoginRequiredMixin, View):
+    """내 단지 소속 현황 + (관리자/운영자면) 검토 큐 링크."""
+
+    def get(self, request):
+        memberships = Membership.objects.filter(member=request.user).select_related("apartment")
+        active = scope.current_membership(request)
+        managed_ids = permissions.managed_apartment_ids(request.user)
+        is_manager_anywhere = bool(managed_ids) and not request.user.is_service_admin
+        return render(
+            request, "apartments/my_apartment.html",
+            {
+                "memberships": memberships,
+                "active": active,
+                "is_manager_anywhere": is_manager_anywhere,
+                "pending_membership_count": (
+                    Membership.objects.filter(role=Membership.Role.MANAGER, status=Membership.Status.REQUESTED).count()
+                    if request.user.is_service_admin else 0
+                ),
+                # design 변경(2R-1): 입주민 승인도 큐가 생겼으므로 관리자/운영자
+                # 모두에게 대기 건수를 보여준다.
+                "pending_resident_count": (
+                    Membership.objects.filter(
+                        apartment_id__in=managed_ids, role=Membership.Role.RESIDENT,
+                        status=Membership.Status.REQUESTED,
+                    ).count()
+                    if managed_ids else 0
+                ),
+            },
+        )
+
+
+class ApartmentSwitchView(LoginRequiredMixin, View):
+    """여러 단지에 소속된 경우(위탁관리 등) 활성 단지를 바꾼다."""
+
+    def post(self, request, pk):
+        membership = get_object_or_404(
+            Membership, apartment_id=pk, member=request.user, status=Membership.Status.APPROVED,
+        )
+        scope.set_active_apartment(request, membership.apartment_id)
+        return redirect("apartments:mine")
+
+
+class MembershipQueueView(AdminRequiredMixin, View):
+    """관리사무소 관리자 신청 승인 큐. 서비스 운영자 전용 — 관리자 역할은
+    쓰기 권한을 새로 여는 것이라 그 단지 관리자 본인이 아니라 서비스
+    운영자가 검토해야 한다(자기 단지에 자기를 승인하는 경로를 막는다)."""
+
+    def get(self, request):
+        pending = Membership.objects.filter(
+            role=Membership.Role.MANAGER, status=Membership.Status.REQUESTED,
+        ).select_related("member", "apartment")
+        return render(request, "apartments/membership_queue.html", {"pending": pending})
+
+
+class ResidentApprovalQueueView(LoginRequiredMixin, View):
+    """입주민 가입 신청 승인 큐. design 변경(2R-1) — 그 단지 관리사무소
+    관리자(또는 서비스 운영자)가 승인한다. 아직 그 단지에 승인된 관리자가
+    한 명도 없으면 permissions.managed_apartment_ids() 가 관리자 계정에게
+    빈 목록을 돌려주므로, 그 경우엔 서비스 운영자가 대신 처리하면 된다."""
+
+    def get(self, request):
+        managed_ids = permissions.managed_apartment_ids(request.user)
+        if not managed_ids:
+            raise Http404("접근 권한이 없습니다.")
+        pending = Membership.objects.filter(
+            apartment_id__in=managed_ids, role=Membership.Role.RESIDENT,
+            status=Membership.Status.REQUESTED,
+        ).select_related("member", "apartment")
+        return render(request, "apartments/resident_queue.html", {"pending": pending})
+
+
+class MembershipDecisionView(LoginRequiredMixin, View):
+    """승인/거절. action=approve|reject.
+
+    권한이 역할별로 다르다:
+      - MANAGER 신청: 서비스 운영자만 (자기 단지 자기 승인 방지)
+      - RESIDENT 신청: 서비스 운영자 또는 그 단지의 승인된 관리자
+        (permissions.can_manage_apartment 가 둘 다 판정)
+    """
+
+    def post(self, request, pk):
+        membership = get_object_or_404(Membership, pk=pk, status=Membership.Status.REQUESTED)
+
+        if membership.role == Membership.Role.MANAGER:
+            if not request.user.is_service_admin:
+                raise Http404("접근 권한이 없습니다.")
+        else:
+            if not permissions.can_manage_apartment(request.user, membership.apartment_id):
+                raise Http404("접근 권한이 없습니다.")
+
+        action = request.POST.get("action")
+        if action not in ("approve", "reject"):
+            return HttpResponseForbidden("잘못된 요청입니다.")
+
+        membership.status = Membership.Status.APPROVED if action == "approve" else Membership.Status.REJECTED
+        membership.approved_by = request.user
+        membership.decided_at = timezone.now()
+        membership.decision_note = request.POST.get("decision_note", membership.decision_note)
+
+        if membership.status == Membership.Status.APPROVED and membership.role == Membership.Role.RESIDENT:
+            # 승인 시점에만 primary/지역 동기화를 확정한다 — 신청 단계에서는
+            # 아직 "진짜 입주민인지" 확인되지 않았으므로 이 부작용을 미룬다.
+            has_other = Membership.objects.filter(
+                member=membership.member, status=Membership.Status.APPROVED,
+            ).exclude(pk=membership.pk).exists()
+            membership.is_primary = not has_other
+            member = membership.member
+            if member.region != membership.apartment.region:
+                member.region = membership.apartment.region
+                member.save(update_fields=["region"])
+
+        membership.save(update_fields=["status", "approved_by", "decided_at", "decision_note", "is_primary"])
+        messages.success(request, f"{membership.member} 님의 신청을 처리했습니다 ({membership.get_status_display()}).")
+
+        # 관리자 신청 → 관리자 승인 큐, 입주민 신청 → 중간관리자 대시보드
+        if membership.role == Membership.Role.MANAGER:
+            return redirect("apartments:membership_queue")
+        return redirect("apartments:manager_dashboard")
+
+
+class MembershipLeaveView(LoginRequiredMixin, View):
+    """단지 나가기(해지) / 승인 박탈. 본인이 스스로 나가는 것과 관리자가
+    남을 내보내는 것을 같은 메커니즘(status=terminated)으로 처리한다 —
+    행을 지우지 않으므로 이력은 남고, 원하면 나중에 다시 신청할 수 있다.
+
+    design 변경(2R-3): 역할별로 "누가 내보낼 수 있는가"가 다르다.
+      - MANAGER 소속: 본인 또는 서비스 운영자만. 관리사무소 관리자끼리는
+        서로 권한을 박탈할 수 없다 — MembershipDecisionView 가 이미
+        "MANAGER 승인은 서비스 운영자만" 이라는 것과 대칭이다.
+      - RESIDENT 소속: 본인, 그 단지의 승인된 관리자, 또는 서비스 운영자
+        (can_manage_apartment 가 셋을 함께 판정).
+    """
+
+    def post(self, request, pk):
+        membership = get_object_or_404(Membership, pk=pk)
+        is_self = membership.member_id == request.user.pk
+        if membership.role == Membership.Role.MANAGER:
+            allowed = is_self or request.user.is_service_admin
+        else:
+            allowed = is_self or permissions.can_manage_apartment(request.user, membership.apartment_id)
+        if not allowed:
+            raise Http404("권한이 없습니다.")
+
+        membership.status = Membership.Status.TERMINATED
+        membership.decided_at = timezone.now()
+        membership.save(update_fields=["status", "decided_at"])
+        if is_self:
+            messages.success(request, f"{membership.apartment} 소속이 해지되었습니다.")
+        else:
+            messages.success(request, f"{membership.member} 님의 {membership.get_role_display()} 승인을 박탈했습니다.")
+        return redirect("apartments:mine")
+
+
+class ManagerDashboardView(LoginRequiredMixin, View):
+    """중간관리자 전용 대시보드. 승인 큐 + 입주민 명단 + 비공개 게시글."""
+
+    def get(self, request):
+        from boards.models import Board
+
+        managed_ids = permissions.managed_apartment_ids(request.user)
+        if not managed_ids:
+            raise Http404("접근 권한이 없습니다.")
+
+        # 현재 단지
+        apartment = scope.current_apartment(request)
+        apt_ids = managed_ids
+
+        # 승인 대기
+        pending = Membership.objects.filter(
+            apartment_id__in=apt_ids, role=Membership.Role.RESIDENT,
+            status=Membership.Status.REQUESTED,
+        ).select_related("member", "apartment").order_by("-applied_at")
+
+        # 승인된 입주민
+        residents = Membership.objects.filter(
+            apartment_id__in=apt_ids, role=Membership.Role.RESIDENT,
+            status=Membership.Status.APPROVED,
+        ).select_related("member", "apartment").order_by("-decided_at")
+
+        # 비공개 처리된 게시글
+        hidden_boards = Board.objects.filter(
+            apartment_id__in=apt_ids, is_hidden=True,
+        ).select_related("author", "hidden_by", "apartment").order_by("-hidden_at")
+
+        # 단지 규정
+        rules = ApartmentRule.objects.filter(
+            apartment_id__in=apt_ids,
+        ).select_related("apartment", "submitted_by").order_by("-created_at")
+
+        return render(request, "apartments/manager_dashboard.html", {
+            "apartment": apartment,
+            "pending": pending,
+            "pending_count": pending.count(),
+            "residents": residents,
+            "resident_count": residents.count(),
+            "hidden_boards": hidden_boards,
+            "hidden_count": hidden_boards.count(),
+            "rules": rules,
+            "rule_count": rules.count(),
+        })
+
+
+class ResidentRosterView(LoginRequiredMixin, View):
+    """승인된 입주민 명단, 단지별로 묶어 본다. 서비스 운영자는 전체 단지,
+    관리사무소 관리자는 자기 관리 단지만 — managed_apartment_ids() 가
+    이미 그렇게 나눠 준다. 여기서 승인 박탈(MembershipLeaveView 재사용)."""
+
+    def get(self, request):
+        managed_ids = permissions.managed_apartment_ids(request.user)
+        if not managed_ids:
+            raise Http404("접근 권한이 없습니다.")
+        residents = Membership.objects.filter(
+            apartment_id__in=managed_ids, role=Membership.Role.RESIDENT,
+            status=Membership.Status.APPROVED,
+        ).select_related("member", "apartment").order_by("apartment__region", "apartment__name")
+        return render(request, "apartments/resident_roster.html", {"residents": residents})
+
+
+class ManagerRosterView(AdminRequiredMixin, View):
+    """승인된 관리사무소 관리자 명단(전 단지). 서비스 운영자 전용 —
+    권한 박탈은 관리자끼리가 아니라 운영자만 할 수 있어야 한다
+    (MembershipLeaveView 참고)."""
+
+    def get(self, request):
+        managers = Membership.objects.filter(
+            role=Membership.Role.MANAGER, status=Membership.Status.APPROVED,
+        ).select_related("member", "apartment").order_by("apartment__region", "apartment__name")
+        return render(request, "apartments/manager_roster.html", {"managers": managers})
+
+
+class ApartmentRuleListView(LoginRequiredMixin, View):
+    """단지 규정 열람. 승인된 소속이 있어야 볼 수 있다.
+
+    design 변경(4차 추가): 서비스 총괄 관리자는 Membership 이 아예 없으므로
+    (관리사무소 관리자로 신청할 수 없다 —
+    apartments/services.py:ServiceAdminCannotApplyError) scope.current_apartment()
+    가 항상 None 이다. "모든 단지의 규정을 관리할 수 있다"는 마이페이지
+    안내 문구가 실제로 동작하려면, current_apartment() 에 기대는 대신
+    ?apartment=<id> 로 직접 단지를 골라야 한다 — 안 고르면 전체 단지
+    목록(선택 화면)을 보여준다."""
+
+    def get(self, request):
+        apartment = scope.current_apartment(request)
+        if request.user.is_service_admin:
+            apartment_id = request.GET.get("apartment")
+            if apartment_id:
+                apartment = get_object_or_404(Apartment, pk=apartment_id)
+            else:
+                apartment = None
+        elif not apartment:
+            messages.info(request, "먼저 단지에 가입해 주세요.")
+            return redirect("apartments:search")
+
+        if not apartment:
+            # 서비스 운영자가 단지를 아직 안 골랐다 — 선택 화면만 보여준다.
+            return render(
+                request, "apartments/rule_list.html",
+                {"apartment": None, "rules": [], "can_upload_rule": False,
+                 "apartments_list": Apartment.objects.order_by("region", "name")},
+            )
+
+        rules = ApartmentRule.objects.filter(
+            apartment=apartment, status=ApartmentRule.Status.APPROVED,
+        ).select_related("submitted_by")
+        return render(
+            request, "apartments/rule_list.html",
+            {
+                "apartment": apartment,
+                "rules": rules,
+                "can_upload_rule": permissions.can_manage_apartment(request.user, apartment.pk),
+            },
+        )
+
+
+class ApartmentRuleCreateView(LoginRequiredMixin, View):
+    """단지 규정 등록. design 변경(2R-3): "입주민 제안 → 검토대기 →
+    관리자 승인" 2단계였던 흐름을 없앴다 — 이제 그 단지를 관리할 수
+    있는 사람(관리사무소 관리자/서비스 운영자)만 접근할 수 있고, 등록
+    즉시 승인 상태로 반영된다(입주민이 규정을 바꾸고 싶으면 커뮤니티에
+    글을 남기는 것으로 대신한다 — apartments/templates/apartments/
+    rule_list.html 참고)."""
+
+    def _resolve_apartment(self, request):
+        """서비스 총괄 관리자는 Membership 이 없어 current_apartment() 가
+        항상 None 이다 — ?apartment=<id>(GET) / apartment(POST 히든필드)
+        로 명시적으로 고른 단지를 쓴다. 그 외 사용자는 기존 그대로
+        current_apartment() 하나만 본다."""
+        if request.user.is_service_admin:
+            apartment_id = request.GET.get("apartment") or request.POST.get("apartment")
+            if not apartment_id:
+                return None
+            return get_object_or_404(Apartment, pk=apartment_id)
+        return scope.current_apartment(request)
+
+    def get(self, request):
+        apartment = self._resolve_apartment(request)
+        if not apartment and not request.user.is_service_admin:
+            messages.info(request, "먼저 단지에 가입해 주세요.")
+            return redirect("apartments:search")
+        if apartment and not permissions.can_manage_apartment(request.user, apartment.pk):
+            raise Http404("접근 권한이 없습니다.")
+        context = {"form": ApartmentRuleForm(), "apartment": apartment}
+        if request.user.is_service_admin:
+            context["apartments_list"] = Apartment.objects.order_by("region", "name")
+        return render(request, "apartments/rule_form.html", context)
+
+    def post(self, request):
+        apartment = self._resolve_apartment(request)
+        if not apartment:
+            if request.user.is_service_admin:
+                messages.warning(request, "규정을 등록할 단지를 선택해 주세요.")
+                return redirect("apartments:rule_create")
+            raise Http404("단지 소속이 없습니다.")
+        if not permissions.can_manage_apartment(request.user, apartment.pk):
+            raise Http404("접근 권한이 없습니다.")
+
+        form = ApartmentRuleForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return render(
+                request, "apartments/rule_form.html", {"form": form, "apartment": apartment}, status=400,
+            )
+
+        rule = form.save(commit=False)
+        rule.apartment = apartment
+        rule.submitted_by = request.user
+        rule.reviewed_by = request.user
+        rule.source_level = ApartmentRule.SourceLevel.OFFICIAL
+        rule.status = ApartmentRule.Status.APPROVED
+        rule.save()  # source_file 을 디스크에 먼저 써야 .path 로 읽을 수 있다
+
+        if not rule.content.strip() and rule.source_file:
+            # rag/service.py:_read_file() 을 재사용한다 — apartments/services.py
+            # 의 sync_rule_to_document() 도 이미 함수 안에서 rag 를 지연
+            # import 하는 것과 같은 패턴(모듈 최상단 import 는 하지 않는다).
+            from pathlib import Path
+
+            from rag import service as rag_service
+
+            extracted = rag_service._read_file(Path(rule.source_file.path)).strip()
+            if not extracted:
+                rule.delete()
+                form.add_error(
+                    "source_file",
+                    "텍스트를 추출하지 못했습니다. 스캔 PDF 라면 OCR 처리 후 다시 올리거나 규정 내용을 직접 입력해 주세요.",
+                )
+                return render(
+                    request, "apartments/rule_form.html", {"form": form, "apartment": apartment}, status=400,
+                )
+            rule.content = extracted
+            rule.save(update_fields=["content"])
+
+        try:
+            services.sync_rule_to_document(rule)
+            messages.success(request, "규정이 등록되어 챗봇 답변에 바로 반영됩니다.")
+        except Exception as exc:
+            messages.warning(request, f"규정은 저장됐지만 색인 갱신에 실패했습니다: {exc}")
+        # ?apartment= 를 항상 붙여 서비스 운영자가 방금 고른 단지로 바로
+        # 돌아가게 한다 — 일반 관리자는 current_apartment() 로 어차피
+        # 같은 단지를 보게 되므로 파라미터가 있어도 무해하다.
+        return redirect(f"{reverse('apartments:rule_list')}?apartment={apartment.pk}")
+
+
+class ApartmentRuleDeleteView(LoginRequiredMixin, View):
+    """단지 규정 삭제. 관리자만 접근 가능. 연동 Document 도 함께 제거하고
+    인덱스를 재구축한다."""
+
+    def post(self, request, pk):
+        rule = get_object_or_404(ApartmentRule, pk=pk)
+        if not permissions.can_manage_apartment(request.user, rule.apartment_id):
+            raise Http404("접근 권한이 없습니다.")
+
+        # 연동 Document 제거 + 인덱스 재구축
+        if rule.document_id:
+            from rag.models import Document
+            Document.objects.filter(pk=rule.document_id).delete()
+            try:
+                from rag import service as rag_service
+                rag_service.rebuild_index()
+            except Exception:
+                pass
+
+        rule.delete()
+        messages.success(request, "규정이 삭제되었습니다.")
+
+        # 대시보드에서 왔으면 대시보드로, 아니면 규정 목록으로
+        next_url = request.POST.get("next", "")
+        if next_url == "dashboard":
+            return redirect("apartments:manager_dashboard")
+        return redirect("apartments:rule_list")

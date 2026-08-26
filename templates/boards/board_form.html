@@ -1,37 +1,48 @@
 {% extends 'base.html' %}
 {% block title %}{% if form.instance.pk %}글 수정{% else %}글쓰기{% endif %} - Ecobot{% endblock %}
 {% block content %}
-<div class="login-container">
-  <div class="login-card board-form-card">
-    <div class="login-logo">
-      <div class="logo-icon">✏️</div>
-      <h1>{% if form.instance.pk %}글 수정{% else %}새 글 작성{% endif %}</h1>
-      <p class="login-subtitle">우리 동네 분리배출 경험·질문을 나눠 주세요</p>
+<div class="guide-layout">
+  <nav class="land-nav">
+    <a class="land-nav-left" href="{% url 'home' %}" style="text-decoration:none;color:inherit">
+      <span class="land-logo-icon">🌿</span><strong class="land-logo-text">Ecobot</strong>
+    </a>
+    <div class="land-nav-right">
+      <a class="btn btn-outline btn-sm" href="{% url 'boards:list' %}" style="text-decoration:none;">← 목록</a>
     </div>
+  </nav>
+  <div class="board-wrap" style="max-width:820px; margin:0 auto;">
     {% if form.non_field_errors %}<div class="form-errors-top">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>{% endif %}
-    <form method="post" enctype="multipart/form-data">
+
+    <h1 style="font-size:22px; font-weight:600; margin:0 0 4px;">{% if form.instance.pk %}글 수정{% else %}새 글 작성{% endif %}</h1>
+    <p style="font-size:13px; color:var(--color-text-secondary); margin:0 0 24px;">우리 아파트 분리배출 경험·질문을 나눠 주세요</p>
+
+    <form method="post" enctype="multipart/form-data" style="background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:28px 32px;">
       {% csrf_token %}
+
       <div class="form-group">
         <label for="id_title">제목</label>
-        <input type="text" name="title" id="id_title" placeholder="예: 부산 남구 스티로폼 배출 요일 문의"
+        <input type="text" name="title" id="id_title" placeholder="예: 스티로폼 배출 요일 문의"
                value="{{ form.title.value|default:'' }}" required>
         {% for e in form.title.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
+
       <div class="form-group">
-        <label for="id_region">지역</label>
-        <select name="region" id="id_region" class="region-dropdown">
-          {% for code, label in form.fields.region.choices %}
-            <option value="{{ code }}" {% if form.region.value == code %}selected{% endif %}>{{ label }}</option>
+        <label for="id_category">카테고리</label>
+        <select name="category" id="id_category" class="region-dropdown">
+          {% for code, label in form.fields.category.choices %}
+            <option value="{{ code }}" {% if form.category.value == code %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
-        {% for e in form.region.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+        {% for e in form.category.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
+
       <div class="form-group">
         <label for="id_content">내용</label>
-        <textarea name="content" id="id_content" rows="10" required
-                  placeholder="예: 남구는 스티로폼을 무슨 요일에 내놔야 하나요? 관리사무소 공지에는...">{{ form.content.value|default:'' }}</textarea>
+        <textarea name="content" id="id_content" rows="12" required
+                  placeholder="예: 스티로폼을 무슨 요일에 내놔야 하나요? 관리사무소 공지에는...">{{ form.content.value|default:'' }}</textarea>
         {% for e in form.content.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
+
       <div class="form-group">
         <label for="id_attachment">첨부파일 (선택)</label>
         {% if form.instance.attachment %}
@@ -40,15 +51,13 @@
         <input type="file" name="attachment" id="id_attachment">
         {% for e in form.attachment.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
-      <button type="submit" class="btn btn-primary btn-full">{% if form.instance.pk %}수정 저장{% else %}등록{% endif %}</button>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+        <a href="{% if form.instance.pk %}{% url 'boards:detail' form.instance.pk %}{% else %}{% url 'boards:list' %}{% endif %}"
+           class="btn btn-outline" style="text-decoration:none;">취소</a>
+        <button type="submit" class="btn btn-primary">{% if form.instance.pk %}수정 저장{% else %}등록{% endif %}</button>
+      </div>
     </form>
-    <p class="login-link">
-      {% if form.instance.pk %}
-        <a href="{% url 'boards:detail' form.instance.pk %}">← 글로 돌아가기</a>
-      {% else %}
-        <a href="{% url 'boards:list' %}">← 목록으로</a>
-      {% endif %}
-    </p>
   </div>
 </div>
 {% endblock %}

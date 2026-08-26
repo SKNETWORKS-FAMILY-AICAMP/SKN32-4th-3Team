@@ -17,6 +17,54 @@
                value="{{ form.title.value|default:'' }}" required>
         {% for e in form.title.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
+      {% if is_service_admin %}
+        <p class="login-subtitle">서비스 총괄 관리자는 문서 범위를 직접 고를 수 있습니다.</p>
+        <div class="form-group">
+          <label>문서 범위</label><br>
+          <label><input type="radio" name="upload_scope" value="national"
+            {% if request.POST.upload_scope == "region" or request.POST.upload_scope == "apartment" %}{% else %}checked{% endif %}> 국가 전체(전국 공통)</label><br>
+          <label><input type="radio" name="upload_scope" value="region"
+            {% if request.POST.upload_scope == "region" %}checked{% endif %}> 지역별</label><br>
+          <label><input type="radio" name="upload_scope" value="apartment"
+            {% if request.POST.upload_scope == "apartment" %}checked{% endif %}> 특정 아파트</label>
+        </div>
+        <div class="form-group" id="scope-region-group">
+          <label for="id_region">지역</label>
+          <select name="region" id="id_region" class="region-dropdown">
+            <option value="">선택</option>
+            {% for code, label in form.fields.region.choices %}
+              {% if code %}<option value="{{ code }}" {% if form.region.value == code %}selected{% endif %}>{{ label }}</option>{% endif %}
+            {% endfor %}
+          </select>
+          {% for e in form.region.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+        </div>
+        <div class="form-group" id="scope-apartment-group">
+          <label for="id_target_apartment">아파트</label>
+          <select name="target_apartment" id="id_target_apartment" class="region-dropdown">
+            <option value="">선택</option>
+            {% for apt in apartments_list %}
+              <option value="{{ apt.pk }}" {% if request.POST.target_apartment == apt.pk|stringformat:"s" %}selected{% endif %}>{{ apt.get_region_display }} · {{ apt.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <script>
+          (function () {
+            var radios = document.querySelectorAll('input[name="upload_scope"]');
+            var regionGroup = document.getElementById('scope-region-group');
+            var aptGroup = document.getElementById('scope-apartment-group');
+            function update() {
+              var checked = document.querySelector('input[name="upload_scope"]:checked');
+              var val = checked ? checked.value : 'national';
+              regionGroup.style.display = (val === 'region') ? '' : 'none';
+              aptGroup.style.display = (val === 'apartment') ? '' : 'none';
+            }
+            radios.forEach(function (r) { r.addEventListener('change', update); });
+            update();
+          })();
+        </script>
+      {% elif is_manager %}
+        <p class="login-subtitle">이 문서는 <strong>{{ apartment.name }}</strong> 단지 문서로 등록되어, 같은 단지 입주민의 챗봇 답변에 바로 반영됩니다.</p>
+      {% else %}
       <div class="form-group">
         <label for="id_region">적용 지역 (선택)</label>
         <select name="region" id="id_region" class="region-dropdown">
@@ -27,6 +75,7 @@
         </select>
         {% for e in form.region.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
+      {% endif %}
       <div class="form-group">
         <label for="id_source_file">파일</label>
         <input type="file" name="source_file" id="id_source_file" accept=".txt,.md,.pdf" required>

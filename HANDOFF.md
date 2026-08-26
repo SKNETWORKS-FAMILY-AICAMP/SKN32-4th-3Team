@@ -151,3 +151,98 @@ API 키 없이 돌리라고 넣어둔 백엔드입니다. 880청크 규모에서
 **문자열 치환으로 `urls.py` 를 수정할 때는 반드시 `assert` 를 거십시오.**
 앵커가 안 맞으면 조용히 아무것도 안 바뀌고, `NoReverseMatch` 가
 한참 뒤에 터집니다. 이번 세션에서 두 번 겪었습니다.
+
+
+---
+
+## 5. 4차 확장 — 시행법 분류 · 유사질문 추천 · 지역 인프라 정리
+
+이식 완료 이후 첫 확장 라운드입니다. 논의된 확장 후보 6가지(BM25 하이브리드
+검색, 리랭커, 지역 확장, 시행법 분류, 아파트 단지 필드, 유사질문 추천) 중
+**검색 품질(BM25·리랭커)과 아파트 필드, 신규 지역 데이터는 다음 라운드로
+미루고** 아래 3가지만 구현했습니다.
+
+### (1) 시행법인지 분류
+
+`data/laws/` 의 모든 법령·시행령·시행규칙·고시·훈령 파일은 2번째 줄에
+`[시행 YYYY. M. D.] [문서종류 제N호, ..., 개정유형]` 헤더를 갖고 있습니다
+(law.go.kr 원문 그대로). `rag/law_text.py` 의 `parse_law_header()` 가 이걸
+정규식으로 파싱하고, `seed_docs.py` 가 `rag.Document` 의 `law_effective_date`
+/ `law_doc_number` / `law_amendment_type` 필드에 채워 넣습니다.
+
+`rag/service.py` 의 `_annotate_law_status()` 가 `search()` 안에서(재색인
+없이, DB 조회 한 번으로) 법령 결과에 `law_is_current` 를 붙입니다.
+**`ask()` 는 `law_is_current is False` 인 법령을 답변 근거(그라운딩)에서
+아예 제외합니다** — LLM 이 아직 시행되지 않은 조문을 현재 규정인 것처럼
+인용하지 못하게, 컨텍스트·출처(sources)·contexts 전부 "이미 시행 중인"
+근거만으로 조립합니다(제외 대상이 있었다는 사실 자체는 버리지 않고
+`_law_notice()` 가 "곧 이렇게 바뀝니다" 안내 문구로 만들어 `law_notice`
+키로 내려보내고, 화면에는 `.response-law-notice` 배지로 뜹니다). 근거가
+전부 제외되고 남는 게 없으면(=관련 법령이 있긴 한데 전부 시행 전) LLM을
+아예 호출하지 않고 그 사실을 그대로 안내합니다. `search()` 자체는
+건드리지 않았습니다 — 관리자 진단 검색(`rag/views.py`)은 여전히 전체
+결과를 보여줘야 하므로, 이 제외는 `ask()` 안에서만 합니다.
+
+이 판정은 **저장해두지 않고 요청마다 오늘 날짜와 비교**합니다
+(`Document.is_currently_effective()`). 그래서 법이 실제로 시행되는
+날이 지나면 재색인이나 별도 배치 작업 없이 바로 다음 질문부터 그
+법이 근거로 편입됩니다 — `unittest.mock.patch("django.utils.timezone.localdate", ...)`
+로 날짜를 미래로 돌려서 `False → True` 로 뒤집히는 것과, 그 즉시
+`ask()` 의 그라운딩에 포함되는 것까지 확인했습니다(아래 실행 결과 참고).
+
+**확인된 실제 사례**: `data/laws/폐기물관리법.txt` 는 `[시행 2027. 1. 8.]`
+로, 이 문서를 쓴 시점(2026-08-25) 기준 **아직 시행 전**입니다. 나머지
+8개 법령 파일은 전부 이미 시행 중입니다. `python manage.py seed_docs`
+(재색인 불필요, DB 필드만 갱신)를 돌린 뒤
+`Document.objects.get(source_key="law:폐기물관리법.txt").is_currently_effective()`
+가 `False` 를 반환하는지로 확인할 수 있습니다.
+
+### (2) 검색 실패 시 유사 질문 추천
+
+`chat/services.py` 의 `assign_cluster()`(질문 임베딩을 기존
+`QuestionCluster` 와 코사인 비교해 병합)와 같은 계산을,
+`rag/service.py` 의 새 함수 `suggest_similar_questions()` 가 재사용합니다.
+차이는 "임계값 이상 중 최고 1개에 편입"이 아니라 "더 낮은 임계값
+(`QUESTION_SUGGEST_THRESHOLD`, 기본 0.55 — 병합 임계값 0.85보다 낮음)
+이상을 유사도 순 최대 `QUESTION_SUGGEST_LIMIT`(기본 3)개 추천"입니다.
+`ask()` 가 근거를 하나도 못 찾았을 때만 호출되고, 응답의
+`suggested_questions` 키로 내려가 화면에 "이런 질문은 어떠세요?" 칩으로
+뜹니다(클릭하면 `sendQuickQuestion()` 으로 바로 재질문).
+
+`QuestionCluster` 테이블이 거의 비어 있으면(신규 설치 직후) 추천이 안
+뜨는 게 정상입니다 — 질문이 쌓일수록 채워집니다.
+
+### (3) 지역 인프라 정리 (신규 지역은 이번엔 추가 안 함)
+
+지역 키워드 매핑(파일명/제목 → 지역 코드)이 `rag/service.py` 와
+`seed_docs.py` 에 **서로 다른 내용으로** 중복돼 있던 걸
+`members/models.py` 의 `REGION_FILENAME_KEYWORDS` 하나로 합쳤습니다.
+두 파일은 이제 이걸 import 만 합니다.
+
+**의도적으로 건드리지 않은 것**: `rag/management/commands/measure_threshold.py`
+의 `REGIONS` 상수와 `evals/` 의 지역 라벨 딕셔너리. 위 2-2절에서 이
+파일들을 3차 원본과 AST 비교로 본문 동일함을 검증했다고 명시했기
+때문에, 이번 정리 범위에서 의도적으로 제외했습니다.
+
+**새 지역을 추가할 때 손댈 파일 체크리스트** (실제 지역 데이터는 아직
+미정 — 다음에 지역명이 정해지면 이 순서대로):
+
+1. `members/models.py` `REGION_CHOICES` 에 코드 추가 → `makemigrations`
+2. `members/models.py` `REGION_FILENAME_KEYWORDS` 에 파일명 키워드 추가
+   (표기 변형 — 띄어쓰기 있음/없음, 축약형 — 도 같이 넣을 것)
+3. `data/guide/[가이드]_<지역명>_분리배출_요령.txt` 작성 후
+   `python manage.py seed_docs --reindex`
+4. (선택, 그 지역까지 지표를 재측정하고 싶으면) `measure_threshold.py`
+   의 `REGIONS` 와 `evals/run_eval_hybrid.py`/`run_report.py` 의 라벨
+   딕셔너리를 수동으로 갱신 — AST 동일성 검증 대상이므로 바꾸는 순간
+   "3차 원본과 본문 동일"이 깨진다는 걸 인지하고 진행할 것
+5. `templates/home.html` 에 지역 타일 하나 추가 (하드코딩돼 있음)
+6. (선택) `members/guides.py` 에 `region-<지역명>` 가이드 페이지 추가
+   — 이 파일의 키(`region-busan`, `region-incheon` 등)는 `REGION_CHOICES`
+   코드(`busan_namgu`, `incheon_michuhol`)와 표기가 다르므로 그대로 따라갈 것
+
+### 새 마이그레이션
+
+`rag.Document`(law_effective_date/law_doc_number/law_amendment_type),
+`chat.ChatMessage`(suggested_questions/law_notice) — 배포 전
+`python manage.py makemigrations && python manage.py migrate` 필요.

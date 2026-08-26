@@ -20,8 +20,25 @@ from django.db import models
 from members.models import REGION_CHOICES
 
 
+CATEGORY_CHOICES = [
+    ("question", "질문"),
+    ("info", "정보공유"),
+    ("review", "후기"),
+    ("free", "자유"),
+]
+
+
 class Board(models.Model):
-    """커뮤니티 게시글 1건."""
+    """커뮤니티 게시글 1건.
+
+    design 변경(2R-3): 커뮤니티는 무조건 단지(apartment) 단위로 쪼갠다 —
+    글쓴이가 소속된 단지 커뮤니티에서만 보이고, 그 단지 소속 회원끼리만
+    읽을 수 있다(boards/views.py:CommunityAccessRequiredMixin·
+    BoardObjectAccessMixin). apartment 를 null 허용으로 두는 이유는 이
+    필드가 생기기 전에 만들어졌을 수 있는 글을 마이그레이션에서 억지로
+    지우거나 단지를 배정하지 않기 위해서다 — 실제 노출 범위는 뷰의
+    필터가 결정한다.
+    """
 
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -29,8 +46,22 @@ class Board(models.Model):
         related_name="boards",
         verbose_name="작성자",
     )
+    apartment = models.ForeignKey(
+        "apartments.Apartment",
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="boards",
+        verbose_name="단지",
+    )
     title = models.CharField("제목", max_length=200)
     content = models.TextField("내용")
+    category = models.CharField(
+        "카테고리",
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default="free",
+        db_index=True,
+    )
     region = models.CharField(
         "지역",
         max_length=50,
@@ -40,7 +71,22 @@ class Board(models.Model):
         help_text="어느 지역 기준의 글인지. 검색 시 지역 필터에 쓰입니다.",
     )
     attachment = models.FileField("첨부파일", upload_to="board_files/%Y/%m/", blank=True, null=True)
+    is_hidden = models.BooleanField(
+        "비공개",
+        default=False,
+        help_text="관리자가 비공개 처리한 글. 목록에서 일반 사용자에게 숨겨집니다.",
+    )
+    hidden_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+",
+        verbose_name="비공개 처리자",
+    )
+    hidden_at = models.DateTimeField("비공개 처리일", null=True, blank=True)
     read_count = models.PositiveIntegerField("조회수", default=0)
+    like_count = models.PositiveIntegerField("좋아요 수", default=0)
+    comment_count = models.PositiveIntegerField("댓글 수", default=0)
     created_at = models.DateTimeField("작성일", auto_now_add=True)
     updated_at = models.DateTimeField("수정일", auto_now=True)
 
@@ -58,3 +104,56 @@ class Board(models.Model):
         from django.urls import reverse
 
         return reverse("boards:detail", args=[self.pk])
+
+
+class Comment(models.Model):
+    """게시글 댓글."""
+
+    board = models.ForeignKey(
+        Board,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        verbose_name="게시글",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        verbose_name="작성자",
+    )
+    content = models.TextField("내용")
+    created_at = models.DateTimeField("작성일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        db_table = "board_comments"
+        ordering = ["created_at"]
+        verbose_name = "댓글"
+        verbose_name_plural = "댓글"
+
+    def __str__(self):
+        return f"{self.author} → {self.board.title[:20]}"
+
+
+class BoardLike(models.Model):
+    """게시글 좋아요. 유저당 1개 제한."""
+
+    board = models.ForeignKey(
+        Board,
+        on_delete=models.CASCADE,
+        related_name="likes",
+        verbose_name="게시글",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="board_likes",
+        verbose_name="사용자",
+    )
+    created_at = models.DateTimeField("생성일", auto_now_add=True)
+
+    class Meta:
+        db_table = "board_likes"
+        unique_together = [("board", "user")]
+        verbose_name = "좋아요"
+        verbose_name_plural = "좋아요"
