@@ -12,6 +12,18 @@ rag/views.py:DocumentUploadView 가 "저장 후 rebuild_index() 호출" 하는
 from __future__ import annotations
 
 
+class ServiceAdminCannotApplyError(Exception):
+    """서비스 총괄 관리자는 관리사무소 관리자로 신청할 수 없다.
+
+    is_service_admin(is_staff/is_superuser)은 이미 모든 단지에 대해
+    can_manage_apartment() 가 무조건 True 를 주는 최상위 권한이다.
+    그런 계정이 특정 단지의 MANAGER Membership 을 또 신청/승인받으면
+    관리자 명단·승인 큐에 의미 없이 섞여 들어가고, "서비스 운영자가
+    관리사무소 관리자 권한을 박탈한다"는 2R-3 설계(동료 관리자는
+    서로 못 건드리고 서비스 운영자만 가능)와도 충돌한다 — 그래서
+    신청 자체를 접수하지 않는다."""
+
+
 def apply_for_membership(member, apartment, role, decision_note=""):
     """(member, apartment, role) 조합으로 Membership 신청을 접수한다.
 
@@ -20,9 +32,19 @@ def apply_for_membership(member, apartment, role, decision_note=""):
     ApartmentJoinView, ManagerApplyView 세 진입점이 모두 이 함수 하나를
     거쳐야 "이미 신청했는데 또 신청"을 같은 방식으로 안내할 수 있다.
 
+    role 이 MANAGER 이고 member 가 이미 서비스 총괄 관리자면
+    ServiceAdminCannotApplyError 를 낸다 — 호출부(회원가입/관리자 신청
+    화면)에서 잡아서 안내 메시지로 바꾼다.
+
     Returns: (membership, created)
     """
     from .models import Membership
+
+    if role == Membership.Role.MANAGER and getattr(member, "is_service_admin", False):
+        raise ServiceAdminCannotApplyError(
+            "서비스 총괄 관리자는 이미 모든 단지를 관리할 수 있어 "
+            "관리사무소 관리자로 별도 신청할 필요가 없습니다."
+        )
 
     existing = Membership.objects.filter(member=member, apartment=apartment, role=role).first()
     if existing:

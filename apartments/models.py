@@ -32,6 +32,10 @@ class Apartment(models.Model):
     name = models.CharField("단지명", max_length=100)
     region = models.CharField("지역", max_length=50, choices=REGION_CHOICES, db_index=True)
     address = models.CharField("주소", max_length=255, blank=True, default="")
+    # 관리사무소 연락처. 입주민 프로필/챗봇 "근거 없음" 안내에 노출되고,
+    # 관리사무소 관리자만(can_manage_apartment) 등록/수정할 수 있다.
+    office_phone = models.CharField("관리사무소 전화번호", max_length=30, blank=True, default="")
+    office_hours = models.CharField("운영시간", max_length=100, blank=True, default="")
     # K-apt 단지코드 대조 여부. 이번 라운드는 수동 시드만 하므로 항상 True.
     is_registered = models.BooleanField("단지 존재 확인", default=True)
     created_by = models.ForeignKey(
@@ -142,7 +146,15 @@ class ApartmentRule(models.Model):
 
     apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name="rules", verbose_name="단지")
     category = models.CharField("분류", max_length=20, choices=Category.choices)
-    content = models.TextField("규정 내용")
+    # content 는 직접 타이핑하거나, source_file(PDF/txt/md)을 올리면
+    # apartments/views.py:ApartmentRuleCreateView 가 rag.service._read_file()
+    # 로 평문을 추출해 자동으로 채운다 — 폼에서는 둘 중 하나만 있으면 된다
+    # (apartments/forms.py:ApartmentRuleForm.clean() 참고).
+    content = models.TextField("규정 내용", blank=True, default="")
+    source_file = models.FileField(
+        "규정 원문 파일", upload_to="apartment_rules/source/%Y/%m/", blank=True, null=True,
+        help_text="PDF/txt/md 파일을 올리면 규정 내용이 자동으로 채워집니다.",
+    )
     photo = models.ImageField("배출장소 사진", upload_to="apartment_rules/%Y/%m/", blank=True, null=True)
     submitted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+", verbose_name="제안자",

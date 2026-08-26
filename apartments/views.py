@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
@@ -10,7 +11,13 @@ from dashboard.views import AdminRequiredMixin
 from members.models import REGION_CHOICES
 
 from . import permissions, scope, services
-from .forms import ApartmentJoinForm, ApartmentRuleForm, ApartmentSearchForm, ManagerApplyForm
+from .forms import (
+    ApartmentJoinForm,
+    ApartmentOfficeForm,
+    ApartmentRuleForm,
+    ApartmentSearchForm,
+    ManagerApplyForm,
+)
 from .models import Apartment, ApartmentRule, Membership
 
 
@@ -91,14 +98,47 @@ class ManagerApplyView(LoginRequiredMixin, View):
             return render(request, "apartments/manager_apply.html", {"form": form}, status=400)
 
         apartment = form.cleaned_data["apartment"]
-        membership, created = services.apply_for_membership(
-            request.user, apartment, Membership.Role.MANAGER,
-            form.cleaned_data.get("decision_note", ""),
-        )
+        try:
+            membership, created = services.apply_for_membership(
+                request.user, apartment, Membership.Role.MANAGER,
+                form.cleaned_data.get("decision_note", ""),
+            )
+        except services.ServiceAdminCannotApplyError as exc:
+            messages.warning(request, str(exc))
+            return redirect("apartments:mine")
         if not created:
             messages.info(request, f"이미 신청 이력이 있습니다 (상태: {membership.get_status_display()}).")
         else:
             messages.success(request, "관리사무소 관리자 신청이 접수되었습니다. 서비스 운영자 승인 후 이용할 수 있습니다.")
+        return redirect("apartments:mine")
+
+
+class ApartmentOfficeInfoView(LoginRequiredMixin, View):
+    """관리사무소 연락처(주소·전화번호·운영시간) 등록/수정. 여기서 채운
+    값은 (1) 프로필/내단지 화면, (2) 챗봇이 근거를 못 찾았을 때 안내
+    문구(rag/service.py:ask()) 양쪽에 쓰인다."""
+
+    def get(self, request):
+        apartment = scope.current_apartment(request)
+        if not apartment or not permissions.can_manage_apartment(request.user, apartment.pk):
+            raise Http404("접근 권한이 없습니다.")
+        return render(
+            request, "apartments/office_form.html",
+            {"form": ApartmentOfficeForm(instance=apartment), "apartment": apartment},
+        )
+
+    def post(self, request):
+        apartment = scope.current_apartment(request)
+        if not apartment or not permissions.can_manage_apartment(request.user, apartment.pk):
+            raise Http404("접근 권한이 없습니다.")
+        form = ApartmentOfficeForm(request.POST, instance=apartment)
+        if not form.is_valid():
+            return render(
+                request, "apartments/office_form.html",
+                {"form": form, "apartment": apartment}, status=400,
+            )
+        form.save()
+        messages.success(request, "관리사무소 정보가 저장되었습니다.")
         return redirect("apartments:mine")
 
 
@@ -282,22 +322,45 @@ class ManagerRosterView(AdminRequiredMixin, View):
 
 
 class ApartmentRuleListView(LoginRequiredMixin, View):
-    """현재 컨텍스트 단지의 규정 열람. 승인된 소속이 있어야 볼 수 있다."""
+    """단지 규정 열람. 승인된 소속이 있어야 볼 수 있다.
+
+    design 변경(4차 추가): 서비스 총괄 관리자는 Membership 이 아예 없으므로
+    (관리사무소 관리자로 신청할 수 없다 —
+    apartments/services.py:ServiceAdminCannotApplyError) scope.current_apartment()
+    가 항상 None 이다. "모든 단지의 규정을 관리할 수 있다"는 마이페이지
+    안내 문구가 실제로 동작하려면, current_apartment() 에 기대는 대신
+    ?apartment=<id> 로 직접 단지를 골라야 한다 — 안 고르면 전체 단지
+    목록(선택 화면)을 보여준다."""
 
     def get(self, request):
         apartment = scope.current_apartment(request)
-        if not apartment and not request.user.is_service_admin:
+        if request.user.is_service_admin:
+            apartment_id = request.GET.get("apartment")
+            if apartment_id:
+                apartment = get_object_or_404(Apartment, pk=apartment_id)
+            else:
+                apartment = None
+        elif not apartment:
             messages.info(request, "먼저 단지에 가입해 주세요.")
             return redirect("apartments:search")
+
+        if not apartment:
+            # 서비스 운영자가 단지를 아직 안 골랐다 — 선택 화면만 보여준다.
+            return render(
+                request, "apartments/rule_list.html",
+                {"apartment": None, "rules": [], "can_upload_rule": False,
+                 "apartments_list": Apartment.objects.order_by("region", "name")},
+            )
+
         rules = ApartmentRule.objects.filter(
             apartment=apartment, status=ApartmentRule.Status.APPROVED,
-        ).select_related("submitted_by") if apartment else ApartmentRule.objects.none()
+        ).select_related("submitted_by")
         return render(
             request, "apartments/rule_list.html",
             {
                 "apartment": apartment,
                 "rules": rules,
-                "can_upload_rule": bool(apartment) and permissions.can_manage_apartment(request.user, apartment.pk),
+                "can_upload_rule": permissions.can_manage_apartment(request.user, apartment.pk),
             },
         )
 
@@ -310,18 +373,36 @@ class ApartmentRuleCreateView(LoginRequiredMixin, View):
     글을 남기는 것으로 대신한다 — apartments/templates/apartments/
     rule_list.html 참고)."""
 
+    def _resolve_apartment(self, request):
+        """서비스 총괄 관리자는 Membership 이 없어 current_apartment() 가
+        항상 None 이다 — ?apartment=<id>(GET) / apartment(POST 히든필드)
+        로 명시적으로 고른 단지를 쓴다. 그 외 사용자는 기존 그대로
+        current_apartment() 하나만 본다."""
+        if request.user.is_service_admin:
+            apartment_id = request.GET.get("apartment") or request.POST.get("apartment")
+            if not apartment_id:
+                return None
+            return get_object_or_404(Apartment, pk=apartment_id)
+        return scope.current_apartment(request)
+
     def get(self, request):
-        apartment = scope.current_apartment(request)
-        if not apartment:
+        apartment = self._resolve_apartment(request)
+        if not apartment and not request.user.is_service_admin:
             messages.info(request, "먼저 단지에 가입해 주세요.")
             return redirect("apartments:search")
-        if not permissions.can_manage_apartment(request.user, apartment.pk):
+        if apartment and not permissions.can_manage_apartment(request.user, apartment.pk):
             raise Http404("접근 권한이 없습니다.")
-        return render(request, "apartments/rule_form.html", {"form": ApartmentRuleForm(), "apartment": apartment})
+        context = {"form": ApartmentRuleForm(), "apartment": apartment}
+        if request.user.is_service_admin:
+            context["apartments_list"] = Apartment.objects.order_by("region", "name")
+        return render(request, "apartments/rule_form.html", context)
 
     def post(self, request):
-        apartment = scope.current_apartment(request)
+        apartment = self._resolve_apartment(request)
         if not apartment:
+            if request.user.is_service_admin:
+                messages.warning(request, "규정을 등록할 단지를 선택해 주세요.")
+                return redirect("apartments:rule_create")
             raise Http404("단지 소속이 없습니다.")
         if not permissions.can_manage_apartment(request.user, apartment.pk):
             raise Http404("접근 권한이 없습니다.")
@@ -338,11 +419,35 @@ class ApartmentRuleCreateView(LoginRequiredMixin, View):
         rule.reviewed_by = request.user
         rule.source_level = ApartmentRule.SourceLevel.OFFICIAL
         rule.status = ApartmentRule.Status.APPROVED
-        rule.save()
+        rule.save()  # source_file 을 디스크에 먼저 써야 .path 로 읽을 수 있다
+
+        if not rule.content.strip() and rule.source_file:
+            # rag/service.py:_read_file() 을 재사용한다 — apartments/services.py
+            # 의 sync_rule_to_document() 도 이미 함수 안에서 rag 를 지연
+            # import 하는 것과 같은 패턴(모듈 최상단 import 는 하지 않는다).
+            from pathlib import Path
+
+            from rag import service as rag_service
+
+            extracted = rag_service._read_file(Path(rule.source_file.path)).strip()
+            if not extracted:
+                rule.delete()
+                form.add_error(
+                    "source_file",
+                    "텍스트를 추출하지 못했습니다. 스캔 PDF 라면 OCR 처리 후 다시 올리거나 규정 내용을 직접 입력해 주세요.",
+                )
+                return render(
+                    request, "apartments/rule_form.html", {"form": form, "apartment": apartment}, status=400,
+                )
+            rule.content = extracted
+            rule.save(update_fields=["content"])
 
         try:
             services.sync_rule_to_document(rule)
             messages.success(request, "규정이 등록되어 챗봇 답변에 바로 반영됩니다.")
         except Exception as exc:
             messages.warning(request, f"규정은 저장됐지만 색인 갱신에 실패했습니다: {exc}")
-        return redirect("apartments:rule_list")
+        # ?apartment= 를 항상 붙여 서비스 운영자가 방금 고른 단지로 바로
+        # 돌아가게 한다 — 일반 관리자는 current_apartment() 로 어차피
+        # 같은 단지를 보게 되므로 파라미터가 있어도 무해하다.
+        return redirect(f"{reverse('apartments:rule_list')}?apartment={apartment.pk}")
