@@ -1,0 +1,51 @@
+# systemd 유닛 — EcoBot (ecobotapt.com)
+#
+# 설치:
+#   sudo cp deploy/ecobot.service /etc/systemd/system/ecobot.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ecobot
+#
+# 확인:
+#   systemctl status ecobot
+#   journalctl -u ecobot -f
+
+[Unit]
+Description=EcoBot Django (gunicorn)
+# 네트워크가 실제로 올라온 뒤에 뜨게 합니다(network.target 만으로는 부족).
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=@APP_USER@
+Group=@APP_USER@
+WorkingDirectory=@PROJECT_DIR@
+
+# 환경변수는 EnvironmentFile 이 아니라 프로젝트의 .env 에서 읽습니다.
+# config/settings.py 가 python-dotenv 로 직접 로딩하기 때문에(settings.py:20)
+# 여기에 또 적으면 두 곳이 어긋날 때 어느 쪽이 이겼는지 알기 어려워집니다.
+ExecStart=@PROJECT_DIR@/.venv/bin/gunicorn \
+    --config @PROJECT_DIR@/deploy/gunicorn.conf.py \
+    config.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+# 무중단 재시작. 코드 배포 후 `systemctl reload ecobot` 로 워커만 갈아치웁니다.
+
+Restart=always
+RestartSec=5
+
+# ── 보안 격리 ──
+# 이 서비스가 뚫려도 시스템 전체로 번지지 않게 합니다.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+# ProtectHome=read-only 는 홈 전체를 읽기 전용으로 만듭니다. 업로드 파일과
+# FAISS 인덱스는 써야 하므로 이 두 곳만 예외로 뚫어 줍니다.
+ReadWritePaths=@PROJECT_DIR@/media
+ReadWritePaths=@PROJECT_DIR@/vector_db
+# SQLite 를 쓴다면 아래 주석을 푸십시오(MySQL 이면 불필요).
+#ReadWritePaths=@PROJECT_DIR@/db.sqlite3
+
+[Install]
+WantedBy=multi-user.target

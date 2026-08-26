@@ -22,11 +22,47 @@ SKN32 4차 프로젝트. 3차에서 FastAPI로 구현한 분리배출 RAG 챗봇
 
 ## 기술 스택
 
-- Python 3.10+ (3.12 권장)
+- Python 3.10+ (3.12 권장) — [버전 호환성](#파이썬-버전--팀원-환경) 참고
 - Django 5.x
 - FAISS (벡터 검색)
 - OpenAI API (임베딩 + LLM) 또는 Gemini
 - SQLite (개발) / MySQL (운영)
+
+---
+
+## 파이썬 버전 · 팀원 환경
+
+**3.10 ~ 3.13 어디서든 동작합니다.** 3.11과 3.12에서 실제로 색인·기동까지
+검증했습니다. 3.12 전용 문법은 쓰지 않았습니다.
+
+- **3.9 이하는 안 됩니다** — 이식된 코드가 `str | None` 문법을 씁니다.
+- `.python-version`은 3.12로 고정돼 있습니다. uv나 pyenv를 쓰면 팀원 환경에
+  3.12가 없어도 자동으로 받아 맞춰 주므로, 그대로 두는 편이 버전이 갈리지
+  않아 낫습니다.
+
+### `mysqlclient` 설치가 실패한다면
+
+`mysqlclient`는 C 확장이고 PyPI에 **Windows 휠만** 올라와 있습니다(2.2.8 기준).
+
+| 환경 | 필요한 것 |
+|---|---|
+| Windows | 없음 — 휠로 바로 설치됩니다 |
+| Linux | `sudo apt install default-libmysqlclient-dev` |
+| macOS | `brew install mysql-client pkg-config` |
+
+증상은 `Exception: Can not find valid pkg-config name.` 입니다.
+**개발 중이라면 `DB_ENGINE=sqlite3`을 쓰면 `mysqlclient` 자체가 필요 없습니다**
+(퀵스타트 경로). MySQL은 서버에서만 씁니다.
+
+### uv 를 쓴다면
+
+```bash
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r requirements.txt
+```
+
+uv는 `python3.x-venv` 시스템 패키지 없이도 venv를 만들고, 없는 파이썬 버전은
+직접 내려받습니다. 다만 위 `mysqlclient` 빌드 의존성은 uv로도 우회되지 않습니다.
 
 ---
 
@@ -158,6 +194,33 @@ SKN32-4th-3Team/
 ├── requirements-quickstart.txt
 └── .env.example
 ```
+
+---
+
+## 배포
+
+운영 서비스는 **https://ecobotapt.com** 입니다.
+전체 절차·트러블슈팅은 **[docs/deploy.md](docs/deploy.md)** 를 보십시오.
+
+```
+Caddy (443) ──▶ gunicorn (127.0.0.1:8000) ──▶ Django ──▶ MySQL + FAISS
+```
+
+| 파일 | 용도 |
+|---|---|
+| `requirements-prod.txt` | 운영 의존성 (torch 계열 제외, gunicorn·whitenoise 추가) |
+| `.env.production.example` | 운영 환경변수 예시 |
+| `deploy/gunicorn.conf.py` | WSGI 서버 설정 |
+| `deploy/ecobot.service` | systemd 유닛 |
+| `deploy/Caddyfile.ecobotapt` | Caddy 사이트 블록 |
+| `deploy/install-system.sh` | root 권한이 필요한 작업 (apt·MySQL·systemd·Caddy) |
+| `docs/decisions/0001-*.md` | 구성 결정 배경과 대가 |
+
+배포 전 반드시 확인할 것:
+
+- `collectstatic` 실행 — 빠뜨리면 **모든 페이지가 500** 입니다
+- `.env` 의 `DJANGO_DEBUG=False`, `DJANGO_BEHIND_PROXY=True`
+- OpenAI 대시보드에서 **월 사용 한도** 설정 (회원가입이 열려 있고 rate limit 이 없습니다)
 
 ---
 

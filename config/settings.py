@@ -48,6 +48,31 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# ── 리버스 프록시(Caddy) 뒤에서 동작할 때 ──
+# Caddy 는 X-Forwarded-Proto 를 자동으로 붙입니다(nginx 와 달리 별도 설정이
+# 필요 없습니다). 이 헤더를 신뢰하도록 알려주지 않으면 Django 는 모든 요청을
+# 평문 http 로 보고, 그 결과 secure 쿠키가 붙지 않고 CSRF 검사가 http:// origin
+# 을 기대해 로그인 · 글쓰기가 전부 403 이 됩니다.
+#
+# ⚠️ 이 값은 앞단 프록시가 반드시 존재할 때만 켜십시오. 프록시 없이 켜면
+#    클라이언트가 보낸 X-Forwarded-Proto 를 그대로 믿게 되어 위조가 가능합니다.
+if _env_bool("DJANGO_BEHIND_PROXY", "False"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# ── CSRF 신뢰 origin ──
+# Django 4+ 는 스킴까지 포함한 정확한 값을 요구합니다(host 만으로는 안 됩니다).
+# 명시하지 않으면 ALLOWED_HOSTS 의 실제 도메인에서 https:// 형태로 유도합니다.
+# 도메인을 추가할 때 두 곳을 고치다 한 곳을 빠뜨리는 사고를 막기 위함입니다.
+_csrf_origins = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").strip()
+if _csrf_origins:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        f"https://{host}"
+        for host in ALLOWED_HOSTS
+        if host not in ("127.0.0.1", "localhost", "testserver", "*")
+    ]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -74,6 +99,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # 정적 파일 서빙. DEBUG=False 면 Django 는 static 을 내보내지 않으므로
+    # 이게 없으면 배포 직후 CSS · JS 가 전부 404 가 됩니다.
+    #
+    # 앞단 Caddy 가 직접 서빙하는 편이 더 빠르지만, Caddy 는 caddy 사용자로
+    # 돌고 홈 디렉터리(<앱계정 홈>, 0750)를 통과하지 못합니다. 권한을 푸는
+    # 대신 WhiteNoise 를 씁니다 — 경로 결합이 없어 이전에도 그대로 동작합니다.
+    # (SecurityMiddleware 바로 다음이어야 합니다. 순서를 바꾸지 마십시오.)
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -165,9 +198,94 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# collectstatic 이 모아 넣을 자리. 이 값이 없으면 collectstatic 자체가
+# ImproperlyConfigured 로 실패합니다. 개발 중에는 쓰이지 않습니다.
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# 업로드 파일 저장 위치. 기본값은 개발과 동일하게 프로젝트 안입니다.
+# 운영에서 Caddy 가 /media/ 를 직접 서빙하게 하려면 홈 디렉터리 밖
+# (예: /var/www/ecobot/media)으로 옮기고 이 값을 .env 에서 덮어쓰십시오.
+MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", "") or (BASE_DIR / "media"))
+
+# WhiteNoise 압축 + 파일명 해싱. 해싱된 이름은 영구 캐시가 가능해집니다.
+# ⚠️ Manifest 방식은 템플릿의 {% static %} 이 가리키는 파일이 실제로
+#    없으면 500 을 냅니다. collectstatic 을 반드시 먼저 돌리십시오.
+if not DEBUG:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# ─────────────────────────── 운영 보안 ───────────────────────────
+# DEBUG=False 일 때만 켭니다. 개발 서버(http://127.0.0.1)에서 secure 쿠키를
+# 켜면 로그인이 되지 않으므로 분기가 필요합니다.
+
+if not DEBUG:
+    # 쿠키를 HTTPS 요청에만 실어 보냅니다.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # 자바스크립트에서 세션 쿠키를 읽지 못하게 합니다(XSS 피해 축소).
+    SESSION_COOKIE_HTTPONLY = True
+    # 외부 사이트에서 넘어온 POST 에는 쿠키를 붙이지 않습니다.
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+    # 브라우저의 MIME 스니핑을 막습니다(업로드 파일이 HTML 로 해석되는 것 방지).
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+
+    # HTTP→HTTPS 리다이렉트는 Caddy 가 이미 처리합니다. 여기서 또 켜면
+    # 프록시 헤더 설정이 어긋났을 때 무한 리다이렉트가 됩니다. 필요할 때만.
+    SECURE_SSL_REDIRECT = _env_bool("DJANGO_SSL_REDIRECT", "False")
+
+    # HSTS. 기본값 0(꺼짐)입니다.
+    # ⚠️ 되돌리기 어렵습니다 — 한번 내보내면 브라우저가 그 기간 동안
+    #    이 도메인을 HTTPS 로만 접속합니다. 인증서가 정상 동작하는 것을
+    #    확인한 뒤에 31536000(1년)으로 올리십시오.
+    SECURE_HSTS_SECONDS = _env_int("DJANGO_HSTS_SECONDS", 0)
+    if SECURE_HSTS_SECONDS:
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+
+
+# ─────────────────────────── 로깅 ───────────────────────────
+# Django 기본 로깅은 DEBUG=False 이면 예외를 ADMINS 에게 메일로만 보냅니다.
+# ADMINS 를 설정하지 않았으므로 그대로 두면 500 에러가 **아무 데도 안 남습니다**.
+# stdout 으로 내보내면 gunicorn → systemd → journald 로 흘러갑니다.
+#   확인:  journalctl -u ecobot -f
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+    },
+    "loggers": {
+        # 처리되지 않은 예외의 트레이스백이 여기로 옵니다.
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
 
 
 # ══════════════════════ RAG 설정 ══════════════════════

@@ -12,3 +12,5 @@ vector_db/chunks.json
 vector_db/embedding_cache.json
 vector_db/langchain/
 
+# collectstatic 산출물 (배포 때마다 재생성)
+staticfiles/

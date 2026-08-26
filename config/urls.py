@@ -1,9 +1,12 @@
 """프로젝트 최상위 URL 라우팅."""
+import os
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.views.generic import TemplateView
+from django.views.static import serve as static_serve
 
 from members.views import GuideView, HomeView
 
@@ -29,3 +32,24 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+elif os.getenv("DJANGO_SERVE_MEDIA", "True").strip().lower() == "true":
+    # 운영에서의 업로드 파일 서빙.
+    #
+    # django.conf.urls.static.static() 은 DEBUG=False 이면 **빈 리스트를
+    # 반환**합니다. 그래서 위 블록만 두면 배포 직후 프로필 사진 · 게시글
+    # 첨부 · 단지 규정 파일이 전부 404 가 됩니다.
+    #
+    # static_serve 는 경로 탈출을 막아 주지만 파일을 파이썬으로 읽어
+    # 내보내므로 웹서버가 직접 주는 것보다 느립니다. 이 프로젝트의 업로드는
+    # 사진 · 소용량 PDF 수준이라 실사용에 문제가 없는 선택입니다.
+    #
+    # 더 빠르게 하려면 MEDIA_ROOT 를 홈 디렉터리 밖으로 옮기고 Caddy 가
+    # file_server 로 직접 서빙하게 한 뒤 DJANGO_SERVE_MEDIA=False 로
+    # 끄십시오. 자세한 절차는 docs/deploy.md 를 보십시오.
+    urlpatterns += [
+        re_path(
+            r"^media/(?P<path>.*)$",
+            static_serve,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]
