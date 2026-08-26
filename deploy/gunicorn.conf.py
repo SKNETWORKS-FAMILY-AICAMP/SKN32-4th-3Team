@@ -29,6 +29,19 @@ graceful_timeout = 30
 # 유휴 연결을 재사용해 TLS·TCP 핸드셰이크를 아낍니다(앞단이 Caddy 하나뿐이라 안전).
 keepalive = 5
 
+# ── 컨트롤 소켓 끄기 ──
+# gunicorn 26 은 런타임 명령용 유닉스 소켓을 만듭니다. 기본 위치는
+# $XDG_RUNTIME_DIR 인데, systemd 시스템 서비스로 돌면 그 변수가 없어서
+# ~/.gunicorn 으로 떨어집니다. 유닛의 ProtectHome=read-only 에 막혀
+# 기동할 때마다 이런 오류가 남습니다:
+#
+#   [ERROR] Control server error: [Errno 30] Read-only file system: '<앱계정 홈>/.gunicorn'
+#
+# 서비스는 정상 동작하지만, 매번 뜨는 무해한 오류는 진짜 오류를 가립니다.
+# 이 소켓을 쓰지 않으므로 끕니다. (쓰려면 유닛에 RuntimeDirectory=ecobot 을
+# 두고 control_socket 을 /run/ecobot/ 아래로 옮기십시오)
+control_socket_disable = True
+
 # ── 워커 재시작 ──
 # faiss 인덱스를 요청마다 역직렬화하므로 파편화가 쌓입니다. 주기적으로
 # 갈아치워 메모리 사용량이 우상향하는 것을 막습니다. jitter 는 모든 워커가
