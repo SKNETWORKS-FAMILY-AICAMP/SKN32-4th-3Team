@@ -26,7 +26,7 @@ DEMO_APARTMENTS = [
 ]
 
 DEMO_RULE = {
-    "category": ApartmentRule.Category.TIME,
+    "category": ApartmentRule.Category.PLACE_TIME,
     "content": "음식물쓰레기는 매주 수요일·토요일 저녁 7시~9시에만 배출 가능합니다. "
                "그 외 요일에는 배출하지 마시고, 부득이한 경우 관리사무소에 문의해 주세요.",
     "source_level": ApartmentRule.SourceLevel.OFFICIAL,
