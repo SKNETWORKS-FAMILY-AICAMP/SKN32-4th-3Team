@@ -49,6 +49,7 @@ usage() {
   mysql-secure  MySQL 을 127.0.0.1 로 제한
   ddns          Cloudflare DDNS 설치 (IP 변경 추적)
   reindex       재색인 워커 설치 (백그라운드 색인)
+  cleanup       고아 업로드 파일 주간 정리 (선택 — 자동 삭제)
 
 런북: $PROJECT_DIR/docs/deploy.md
 USAGE
@@ -57,7 +58,7 @@ USAGE
 # 사용법을 root 검사보다 먼저 봅니다 — 인자를 몰라서 실행해 본 사람에게
 # "root 로 실행하십시오"만 띄우면 무엇을 하라는 건지 알 수 없습니다.
 case "${1:-}" in
-    deps|db|service|caddy|all|mysql-secure|ddns|reindex) ;;
+    deps|db|service|caddy|all|mysql-secure|ddns|reindex|cleanup) ;;
     *) usage; exit 1 ;;
 esac
 
@@ -380,6 +381,44 @@ MSG
 }
 
 
+install_cleanup() {
+    say "고아 업로드 파일 주간 정리"
+    local src="$PROJECT_DIR/deploy"
+
+    [[ -x "$PROJECT_DIR/.venv/bin/python" ]] \
+        || die ".venv 가 없습니다. 앱 계정 계정에서 의존성을 먼저 설치하십시오"
+
+    # 켜기 전에 무엇이 지워질지 보여 줍니다. 자동 삭제를 붙이는 작업이라
+    # "설치했더니 파일이 사라졌다"가 되지 않게 합니다.
+    warn "이 타이머는 파일을 되돌릴 수 없게 지웁니다. 현재 대상은 다음과 같습니다:"
+    echo
+    sudo -u "$APP_USER" env -C "$PROJECT_DIR" \
+        "$PROJECT_DIR/.venv/bin/python" manage.py cleanup_orphan_files \
+        --min-age-hours 168 2>/dev/null | sed "s/^/    /"
+    echo
+
+    install -m 644 -o root -g root "$src/ecobot-cleanup.service" /etc/systemd/system/
+    install -m 644 -o root -g root "$src/ecobot-cleanup.timer"   /etc/systemd/system/
+    systemctl daemon-reload
+    ok "유닛 2개 설치됨"
+
+    systemctl enable --now ecobot-cleanup.timer
+    ok "타이머 활성화됨 (매주 일요일 04:00)"
+    systemctl list-timers ecobot-cleanup.timer --no-pager | sed -n "2p"
+
+    cat <<MSG
+
+  지금 한 번 돌려 보려면:
+      sudo systemctl start ecobot-cleanup
+      journalctl -u ecobot-cleanup -n 30 --no-pager
+
+  삭제 없이 목록만 보려면 (앱 계정 계정):
+      cd $PROJECT_DIR
+      .venv/bin/python manage.py cleanup_orphan_files
+MSG
+}
+
+
 case "$1" in
     deps)    install_deps ;;
     db)      install_db ;;
@@ -389,6 +428,7 @@ case "$1" in
     mysql-secure) secure_mysql ;;
     ddns)         install_ddns ;;
     reindex)      install_reindex ;;
+    cleanup)      install_cleanup ;;
 esac
 
 say "완료"

@@ -95,6 +95,9 @@ INSTALLED_APPS = [
     # 가리키므로(apartments.Apartment) migrate 순서상 rag/chat 보다 먼저
     # 와야 한다.
     "apartments",
+    # 모델 없는 유지보수 앱. 업로드 파일의 수명을 DB 레코드에 맞추는
+    # 시그널을 붙입니다(고아 파일 방지). 마이그레이션이 없습니다.
+    "maintenance",
 ]
 
 MIDDLEWARE = [

@@ -595,6 +595,52 @@ curl -s https://ecobotapt.com/rag/status/ | jq   # 진행 상태 (로그인 필�
 > 차단기**입니다. 그것만 두면 한 명이 예산을 다 쓰고 나머지 사용자가 전부
 > 막힙니다. 둘 다 두십시오.
 
+### 11-5. 고아 업로드 파일 정리
+
+**문제.** Django 의 `FileField` 는 레코드를 지워도 **파일을 지우지 않습니다.**
+1.3 에서 의도적으로 바뀐 동작인데(트랜잭션 롤백 시 파일을 되살릴 수 없어서),
+그대로 두면 `media/` 에 고아 파일이 계속 쌓입니다. 파일을 교체 업로드할 때
+밀려난 옛 파일도 마찬가지입니다.
+
+**앞으로 생기는 것** — `maintenance` 앱이 시그널로 막습니다. 별도 설치가
+필요 없고, 프로젝트 안의 `FileField` 를 자동으로 찾아 붙습니다:
+
+```
+members.Member.photo
+boards.Board.attachment
+rag.Document.source_file
+apartments.ApartmentRule.source_file / .photo
+```
+
+삭제는 `transaction.on_commit()` 이후에만 일어납니다. 롤백된 삭제 때문에
+파일을 날리면 되돌릴 방법이 없습니다.
+
+**이미 쌓인 것** — 관리 명령으로 회수합니다. **기본은 조회만** 합니다:
+
+```bash
+cd $PROJECT_DIR
+.venv/bin/python manage.py cleanup_orphan_files                  # 목록만
+.venv/bin/python manage.py cleanup_orphan_files --delete         # 실제 삭제
+.venv/bin/python manage.py cleanup_orphan_files --delete --min-age-hours 1
+```
+
+`--min-age-hours`(기본 24)는 **업로드 중인 파일을 지우지 않기 위한 장치**
+입니다. 업로드는 "파일을 먼저 쓰고 → 레코드를 저장"하는 순서라, 그 사이에
+명령이 돌면 방금 올라온 파일이 고아로 보입니다.
+
+**주간 자동 정리 (선택)** — `관리 계정` 세션:
+
+```bash
+sudo bash $PROJECT_DIR/deploy/install-system.sh cleanup
+```
+
+매주 일요일 04:00 에 7일 이상 된 고아 파일을 지웁니다. 설치 스크립트가
+**켜기 전에 무엇이 지워질지 먼저 보여 줍니다.**
+
+> ⚠️ 자동 삭제입니다. 시그널이 제 역할을 하면 지울 것이 없으므로 이건
+> 안전망일 뿐입니다 — 굳이 켜지 않아도 됩니다. 필요할 때 위 명령을 손으로
+> 돌리는 편이 안전합니다.
+
 ---
 
 ## 12. 트러블슈팅
@@ -617,6 +663,8 @@ curl -s https://ecobotapt.com/rag/status/ | jq   # 진행 상태 (로그인 필�
 | 업로드해도 검색에 안 잡힘 | 재색인이 아직 안 돌았거나 실패 | `journalctl -u ecobot-reindex -n 30` |
 | 재색인이 계속 실패 | OpenAI 키·한도 문제 | `/rag/status/` 의 `last_error` 확인 |
 | 챗봇이 **429** 를 반환 | 하루 한도 초과 | 의도된 동작. `CHAT_DAILY_LIMIT` 조정 |
+| 챗봇이 **503** 을 반환 | 임베딩 API 실패(지출 한도·키) | `journalctl -u ecobot` 에 원인이 남습니다 |
+| `media/` 용량이 계속 증가 | 고아 파일 누적 | `cleanup_orphan_files` (11-5) |
 
 ### 롤백  — `관리 계정` 세션
 

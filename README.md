@@ -185,6 +185,7 @@ SKN32-4th-3Team/
 ├── boards/          # 커뮤니티 게시판
 ├── apartments/      # 아파트 단지·멤버십·규정·관리자
 ├── dashboard/       # 최종관리자 대시보드
+├── maintenance/     # 운영 유지보수 (고아 업로드 파일 정리, 모델 없음)
 ├── templates/       # HTML 템플릿
 ├── static/          # CSS·JS·이미지
 ├── data/            # 법령·가이드 원본 문서
@@ -215,6 +216,8 @@ Caddy (443) ──▶ gunicorn (127.0.0.1:8000) ──▶ Django ──▶ MySQL
 | `deploy/Caddyfile.ecobotapt` | Caddy 사이트 블록 |
 | `deploy/install-system.sh` | root 권한이 필요한 작업 (apt·MySQL·systemd·Caddy·DDNS) |
 | `deploy/ddns-cloudflare.*` | 공인 IP 변경 시 A 레코드 자동 갱신 |
+| `deploy/ecobot-reindex.*` | 문서 변경 시 백그라운드 재색인 |
+| `deploy/ecobot-cleanup.*` | 고아 업로드 파일 주간 정리 (선택) |
 | `docs/decisions/0001-*.md` | 구성 결정 배경과 대가 |
 
 배포 전 반드시 확인할 것:

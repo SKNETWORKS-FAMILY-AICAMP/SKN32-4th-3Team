@@ -1,0 +1,15 @@
+# 주 1회. 시그널이 제 역할을 하면 지울 것이 없으므로 자주 돌 이유가 없고,
+# 자동 삭제라 빈도를 낮게 두는 편이 사고 범위를 줄입니다.
+
+[Unit]
+Description=EcoBot 고아 파일 정리 (주 1회)
+Requires=ecobot-cleanup.service
+
+[Timer]
+OnCalendar=Sun 04:00
+# 껐다 켠 사이에 지나간 일정을 뒤늦게라도 실행합니다.
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
