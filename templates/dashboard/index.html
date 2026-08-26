@@ -173,10 +173,10 @@
     </div>
     <table class="admin-table" id="doc-table">
       <thead>
-        <tr><th>문서명</th><th>유형</th><th>지역</th><th>청크</th></tr>
+        <tr><th>문서명</th><th>유형</th><th>지역</th><th>청크</th><th></th></tr>
       </thead>
       <tbody id="doc-table-body">
-        <tr><td colspan="4" class="stat-placeholder">데이터 로딩 중...</td></tr>
+        <tr><td colspan="5" class="stat-placeholder">데이터 로딩 중...</td></tr>
       </tbody>
     </table>
 
@@ -185,10 +185,59 @@
         <div class="upload-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </div>
-        <p class="upload-text">새 문서 업로드 (.txt, .md, .pdf)</p>
-        <p class="upload-hint">클릭하거나 파일을 드래그하세요</p>
+        <p class="upload-text">새 문서 업로드 (.txt, .md, .pdf, .csv)</p>
+        <p class="upload-hint">클릭하거나 파일을 드래그하세요 — 여러 개 선택 가능</p>
       </div>
-      <input type="file" id="file-input" accept=".txt,.md,.pdf" style="display:none" onchange="handleFileUpload(this)">
+      <input type="file" id="file-input" accept=".txt,.md,.pdf,.csv" multiple style="display:none" onchange="onUploadFilesSelected(this)">
+
+      <!-- 4차 추가분: 파일을 고르면 색인 전에 범위를 먼저 정하게 한다.
+           예전에는 이 위젯이 항상 as_public=1 로만 보내서 아파트/지역
+           선택 없이 곧장 "가이드/전국공통"으로 색인됐다 — rag:upload 가
+           이제 upload_scope 를 명시적으로 요구하므로(자동 국가 전체
+           기본값 제거) 여기서도 같은 선택지를 보여준다. -->
+      <div class="upload-scope-panel hidden" id="upload-scope-panel">
+        <p class="upload-hint" id="upload-file-list"></p>
+        <div class="form-group">
+          <label for="doc-upload-scope">문서 범위</label>
+          <select id="doc-upload-scope" class="region-dropdown">
+            <option value="">선택</option>
+            <option value="national">국가 전체(전국 공통)</option>
+            <option value="region">지역별</option>
+            <option value="apartment">특정 아파트</option>
+          </select>
+        </div>
+        <div class="form-group hidden" id="doc-upload-national-group">
+          <label for="doc-upload-national-type">문서 종류</label>
+          <select id="doc-upload-national-type" class="region-dropdown">
+            <option value="guide">가이드</option>
+            <option value="law">법령</option>
+          </select>
+        </div>
+        <div class="form-group hidden" id="doc-upload-region-group">
+          <label for="doc-upload-region">지역</label>
+          <select id="doc-upload-region" class="region-dropdown">
+            <option value="">선택</option>
+            {% for code, label in region_choices %}
+              <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group hidden" id="doc-upload-apartment-group">
+          <label for="doc-upload-apartment">아파트</label>
+          <select id="doc-upload-apartment" class="region-dropdown">
+            <option value="">선택</option>
+            {% for item in apt_data %}
+              <option value="{{ item.apartment.pk }}">{{ item.apartment.get_region_display }} · {{ item.apartment.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <p class="form-error hidden" id="upload-scope-error">범위를 선택해 주세요.</p>
+        <div style="display:flex; gap:8px; margin-top:8px">
+          <button type="button" class="btn btn-primary btn-sm" onclick="submitAdminUpload()">업로드하고 색인하기</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="cancelAdminUpload()">취소</button>
+        </div>
+      </div>
+
       <div class="upload-progress hidden" id="upload-progress">
         <div class="upload-progress-bar" id="upload-progress-bar"></div>
         <span class="upload-progress-text" id="upload-progress-text">업로드 중...</span>
@@ -207,6 +256,7 @@
     "documents": "{% url 'dashboard:documents' %}",
     "rebuild": "{% url 'rag:rebuild' %}",
     "upload": "{% url 'rag:upload' %}",
+    "documentDeleteBase": "{% url 'rag:document_delete' 0 %}",
     "feedbackStats": "{% url 'dashboard:feedback_stats' %}"
   }
 }

@@ -600,12 +600,60 @@ body {
 .chat-source-item { color: var(--color-text-muted); }
 .chat-source-sep { color: var(--color-text-muted); font-size: 11px; }
 
-/* 법령 (muted 한 줄) */
-.chat-law-text {
-  margin-top: 4px;
+/* 시행 예정 법령 안내 카드 (4차 추가분: 실천 팁 카드와 같은 패턴으로
+   눈에 띄게 — 예전엔 muted 한 줄이라 놓치기 쉬웠다. 팁(노란색)과
+   구분되게 경고 톤(빨강 계열)을 쓴다 — dashboard 의 "거절" 버튼과
+   같은 톤(#A32D2D)을 재사용해 팔레트를 늘리지 않는다.) */
+.chat-law-notice-card {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #FDECEC;
+  border: 1px solid #F3B9B9;
+}
+.chat-law-notice-label {
+  font-size: 12px; font-weight: 600;
+  color: #A32D2D; margin-bottom: 4px;
+}
+.chat-law-notice-text {
+  font-size: 13px; color: #7A2323;
+  line-height: 1.55; margin: 0;
+}
+
+/* 연락처 카드 (관리사무소 · 지자체) */
+.chat-contact-cards {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.contact-card {
+  flex: 1 1 200px;
+  min-width: 180px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.contact-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.contact-card-icon { font-size: 18px; line-height: 1; }
+.contact-card-title {
+  font-size: 13px; font-weight: 600;
+  color: var(--color-text);
+}
+.contact-card-subtitle {
   font-size: 11px;
   color: var(--color-text-muted);
-  line-height: 1.4;
+}
+.contact-card-row {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
 }
 
 /* 추천 질문 */
@@ -1687,6 +1735,25 @@ body {
 .upload-progress.hidden {
   display: none;
 }
+/* 4차 추가분: 대시보드 문서 업로드 위젯의 범위 선택 패널
+   (templates/dashboard/index.html upload-scope-panel). 사이트 전역에
+   범용 .hidden 규칙이 없어서(스코프별로만 정의) 여기도 같은 패턴으로
+   좁혀서 정의한다. */
+.upload-scope-panel {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.upload-scope-panel.hidden {
+  display: none;
+}
+.form-group.hidden {
+  display: none;
+}
+.form-error.hidden {
+  display: none;
+}
 .upload-progress-bar {
   height: 4px;
   background: #3B6D11;
@@ -1951,8 +2018,6 @@ body {
 .comm-pill.active {
   background: var(--color-primary); color: #fff; border-color: var(--color-primary);
 }
-.comm-pill.pill-notice { border-color: #F5C6C6; color: #A32D2D; background: #FCEBEB; }
-.comm-pill.pill-notice.active { background: #A32D2D; color: #fff; border-color: #A32D2D; }
 .comm-pill.pill-question { border-color: #B5D4F4; color: #185FA5; background: #E6F1FB; }
 .comm-pill.pill-question.active { background: #185FA5; color: #fff; border-color: #185FA5; }
 .comm-pill.pill-info { border-color: #9FE1CB; color: #0F6E56; background: #E1F5EE; }
@@ -1961,38 +2026,12 @@ body {
 .comm-pill.pill-review.active { background: #854F0B; color: #fff; border-color: #854F0B; }
 .comm-pill.pill-free { border-color: #CECBF6; color: #534AB7; background: #EEEDFE; }
 .comm-pill.pill-free.active { background: #534AB7; color: #fff; border-color: #534AB7; }
+.comm-pill.pill-notice { border-color: #F5C6C6; color: #A32D2D; background: #FCEBEB; }
+.comm-pill.pill-notice.active { background: #A32D2D; color: #fff; border-color: #A32D2D; }
 .comm-sort {
   padding: 7px 12px; font-size: 13px;
   border: 1px solid var(--color-border); border-radius: var(--radius);
   background: var(--color-surface); outline: none;
-}
-
-/* -- Notice banner -- */
-.comm-notice-banner {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px; margin-bottom: 8px;
-  background: #F6FAF0; border: 1px solid #D5E6C0; border-radius: 10px;
-  text-decoration: none; color: var(--color-text);
-  transition: background 0.15s;
-}
-.comm-notice-banner:hover { background: #EDF5E0; }
-.comm-notice-left {
-  display: flex; align-items: center; gap: 10px;
-  min-width: 0; flex: 1;
-}
-.comm-notice-new {
-  font-size: 10px; font-weight: 700; color: #E53E3E;
-  background: #FFF0F0; padding: 2px 6px; border-radius: 4px;
-  letter-spacing: 0.5px; flex-shrink: 0;
-}
-.comm-notice-title {
-  font-size: 14px; font-weight: 600; color: var(--color-text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.comm-notice-right {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 12px; color: var(--color-text-secondary);
-  flex-shrink: 0; margin-left: 16px;
 }
 
 /* -- Card grid -- */
@@ -2016,7 +2055,6 @@ body {
   display: inline-block;
 }
 .badge-hidden { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB; }
-.badge-notice { background: #FCEBEB; color: #A32D2D; font-weight: 600; }
 .badge-hot { background: #FAECE7; color: #993C1D; }
 .badge-question { background: #E6F1FB; color: #185FA5; }
 .badge-info { background: #E1F5EE; color: #0F6E56; }
@@ -2047,6 +2085,36 @@ body {
 .comm-card-date { font-size: 12px; color: var(--color-text-muted); }
 .comm-card-stats {
   display: flex; gap: 10px; font-size: 12px; color: var(--color-text-muted);
+}
+
+.badge-notice { background: #FCEBEB; color: #A32D2D; font-weight: 600; }
+
+/* -- Notice banner -- */
+.comm-notice-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; margin-bottom: 8px;
+  background: #F6FAF0; border: 1px solid #D5E6C0; border-radius: 10px;
+  text-decoration: none; color: var(--color-text);
+  transition: background 0.15s;
+}
+.comm-notice-banner:hover { background: #EDF5E0; }
+.comm-notice-left {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 0; flex: 1;
+}
+.comm-notice-new {
+  font-size: 10px; font-weight: 700; color: #E53E3E;
+  background: #FFF0F0; padding: 2px 6px; border-radius: 4px;
+  letter-spacing: 0.5px; flex-shrink: 0;
+}
+.comm-notice-title {
+  font-size: 14px; font-weight: 600; color: var(--color-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.comm-notice-right {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--color-text-secondary);
+  flex-shrink: 0; margin-left: 16px;
 }
 
 .comm-empty {

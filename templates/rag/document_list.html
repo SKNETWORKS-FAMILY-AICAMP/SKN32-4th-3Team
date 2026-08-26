@@ -26,7 +26,7 @@
           <td>{{ doc.get_source_type_display }}</td>
           <td>{{ doc.get_region_display|default:"전국 공통" }}</td>
           <td style="text-align:right">
-            {% if doc.source_type == 'manual' %}
+            {% if doc.pk in deletable_ids %}
               <form method="post" action="{% url 'rag:document_delete' doc.pk %}" style="display:inline"
                     onsubmit="return confirm('이 문서를 삭제하고 색인에서 제거할까요?')">
                 {% csrf_token %}<button class="btn-text" type="submit">삭제</button>

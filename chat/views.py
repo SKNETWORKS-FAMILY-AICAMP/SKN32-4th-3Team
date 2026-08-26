@@ -185,6 +185,7 @@ class ChatAskView(LoginRequiredMixin, View):
             # 4차 추가분: 유사 질문 추천 · 법령 시행 안내
             suggested_questions=result.get("suggested_questions", []) or [],
             law_notice=result.get("law_notice", "") or "",
+            contact_cards=result.get("contact_cards", []) or [],
         )
         session.save(update_fields=["updated_at"])  # 목록 정렬 갱신
 
@@ -198,6 +199,7 @@ class ChatAskView(LoginRequiredMixin, View):
                 "sources": result.get("sources", []),
                 "suggested_questions": result.get("suggested_questions", []),
                 "law_notice": result.get("law_notice", ""),
+                "contact_cards": result.get("contact_cards", []),
             }
         )
 
@@ -243,6 +245,7 @@ class ChatSessionListView(LoginRequiredMixin, View):
                             # 4차 추가분: 새로고침 후 복원에도 같이 실어 보낸다.
                             "suggested_questions": m.suggested_questions,
                             "law_notice": m.law_notice,
+                            "contact_cards": m.contact_cards,
                             "feedback": m.feedback,
                             "message_id": m.pk,
                             "created_at": m.created_at.isoformat(),

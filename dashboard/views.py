@@ -93,6 +93,7 @@ class DashboardView(AdminRequiredMixin, View):
 
     def get(self, request):
         from apartments.models import Apartment, ApartmentRule, Membership
+        from members.models import REGION_CHOICES
 
         # 관리사무소 관리자 승인 대기
         pending_managers = Membership.objects.filter(
@@ -131,6 +132,7 @@ class DashboardView(AdminRequiredMixin, View):
                 "apt_count": len(apt_data),
                 "total_residents": total_residents,
                 "total_rules": total_rules,
+                "region_choices": [(c, l) for c, l in REGION_CHOICES if c != "common"],
             },
         )
 
@@ -396,17 +398,24 @@ class DocumentsAPIView(AdminRequiredMixin, View):
         # 3차 admin.py 는 같은 정규식을 자리에서 다시 만들었습니다)
         from rag.service import _clean_title
 
+        # 4차 추가분: document_id 가 있으면(DB 문서) 그걸로 묶어
+        # 서로 다른 문서가 같은 제목이어도 별도 줄로 보이게 한다.
+        # seed_docs 가 폴더에서 심은 문서는 DB 행이 없어 document_id
+        # 가 None 이므로 그때만 예전처럼 제목으로 묶는다.
         doc_map: dict[str, dict] = {}
         for chunk in chunks:
             title = chunk.get("title", "제목 없음")
-            if title not in doc_map:
-                doc_map[title] = {
+            doc_id = chunk.get("document_id")
+            key = f"id:{doc_id}" if doc_id is not None else f"title:{title}"
+            if key not in doc_map:
+                doc_map[key] = {
                     "title": _clean_title(title),
                     "source_type": chunk.get("source_type", "manual"),
                     "region": chunk.get("region") or "common",
                     "chunk_count": 0,
+                    "document_id": doc_id,
                 }
-            doc_map[title]["chunk_count"] += 1
+            doc_map[key]["chunk_count"] += 1
 
         docs = list(doc_map.values())
         for d in docs:
