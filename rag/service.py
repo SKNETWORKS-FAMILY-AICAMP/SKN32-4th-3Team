@@ -36,9 +36,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import logging
+
 from django.conf import settings
 
 from . import chunking, embeddings, vector_store
+
+logger = logging.getLogger(__name__)
 
 # 소유자와 무관하게 전체 공개되는 문서 유형 (수집한 공공자료)
 # 버그 수정(2R-2): "apartment" 가 빠져 있어서 owner_id 필터가 단지 규정을
@@ -292,6 +296,30 @@ def search(
     return results[:top_k]
 
 
+def _retrieval_error_message(exc: Exception) -> str:
+    """검색 실패 원인을 사용자에게 보여줄 한 문장으로 바꾼다.
+
+    분류 기준은 rag/llm.py 의 _generate_openai() 와 같게 맞춘다 — 같은
+    API 의 같은 오류를 두 곳이 다르게 부르면 로그를 읽을 때 헷갈린다.
+
+    **원인 자체는 사용자에게 알리지 않는다.** "API 키가 잘못됐습니다" 같은
+    문구는 사용자가 할 수 있는 일이 없는데 서비스 내부 사정만 노출한다.
+    진짜 원인은 로그로 간다(journalctl -u ecobot).
+    """
+    msg = str(exc).lower()
+
+    if "insufficient_quota" in msg or "quota" in msg or "429" in msg or "rate limit" in msg:
+        # 지출 한도 소진이 여기로 온다. 관리자가 한도를 올리면 풀리므로
+        # "잠시 후"가 맞는 안내다.
+        return "현재 API 사용량이 초과되었습니다. 잠시 후 다시 질문해 주세요."
+
+    if "api key" in msg or "401" in msg or "authentication" in msg or "invalid_api_key" in msg:
+        # 키 문제는 저절로 풀리지 않는다. 기다리라고 하면 안 된다.
+        return "검색 기능에 문제가 있어 답변할 수 없습니다. 관리자에게 문의해 주세요."
+
+    return "일시적인 오류로 답변할 수 없습니다. 잠시 후 다시 시도해 주세요."
+
+
 def _drop_missing_documents(results: list[dict]) -> list[dict]:
     """DB 에 없거나 승인 상태가 아닌 문서의 청크를 결과에서 제거한다.
 
@@ -490,7 +518,31 @@ def ask(
     않고 매번 오늘 날짜와 비교), 다음 질문부터는 자동으로 근거에
     포함된다 — 별도 배치 작업이 필요 없다.
     """
-    results = search(question, top_k, owner_id, region=region, balanced=True, apartment_id=apartment_id)
+    # 검색은 임베딩 API 호출을 포함한다. 지출 한도가 소진되거나 키가
+    # 만료되면 여기서 예외가 올라오는데, 그대로 두면 사용자에게 500 이
+    # 나간다. 답변 생성(LLM) 쪽은 이미 폴백이 있으므로(rag/llm.py) 이쪽만
+    # 비어 있던 셈이다.
+    #
+    # search() 자체는 그대로 예외를 올린다 — 관리자 진단 화면
+    # (RagSearchView)에서는 원인이 그대로 보여야 한다.
+    try:
+        results = search(question, top_k, owner_id, region=region, balanced=True, apartment_id=apartment_id)
+    except Exception as exc:
+        logger.exception("검색 실패 — 질문=%r", question[:80])
+        return {
+            # 호출자가 통계·기록에서 제외할 수 있도록 표시한다.
+            # 이건 "자료를 못 찾은" 것이 아니라 "찾아보지도 못한" 것이라,
+            # '자료없음 대응률' 지표에 섞이면 수치가 오염된다.
+            "error": "retrieval_unavailable",
+            "answer": _retrieval_error_message(exc),
+            "law": "",
+            "tip": "",
+            "source": "",
+            "sources": [],
+            "contexts": [],
+            "suggested_questions": [],
+            "law_notice": "",
+        }
 
     grounding = [r for r in results if r.get("law_is_current") is not False]
     law_notice = _law_notice(results)

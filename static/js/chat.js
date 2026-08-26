@@ -285,8 +285,23 @@ async function askBackend(question) {
       region: session ? session.region : document.getElementById('region-select').value,
       session_id: session && session.serverId ? session.serverId : null,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    // 서버가 본문에 이유를 담아 보내는 경우가 있다 —
+    //   429: 하루 질문 한도 초과
+    //   503: 검색 API 장애(지출 한도 소진 등)
+    // 예전에는 !res.ok 이면 곧바로 throw 해서 그 문구를 버리고
+    // "답변을 가져오지 못했습니다"라는 일반 안내만 띄웠다. 사용자는
+    // 왜 막혔는지 알 수 없었다.
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      const reason = (data && (data.detail || data.answer)) ||
+        '답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+      if (session) {
+        if (data && data.session_id) session.serverId = data.session_id;
+        session.messages.push({ role: 'bot', content: reason, sources: [] });
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
 
     if (session) {
       session.serverId = data.session_id;
@@ -302,7 +317,10 @@ async function askBackend(question) {
     }
   } catch (err) {
     console.error('챗봇 응답 실패:', err);
-    if (session) {
+    // 위 !res.ok 분기가 이미 사유를 넣었으면 중복으로 쌓지 않는다.
+    // (네트워크 끊김처럼 응답 자체가 없던 경우에만 일반 안내를 넣는다)
+    const last = session && session.messages[session.messages.length - 1];
+    if (session && !(last && last.role === 'bot')) {
       session.messages.push({
         role: 'bot',
         content: '답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.',
