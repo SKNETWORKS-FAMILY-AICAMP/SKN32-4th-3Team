@@ -525,6 +525,76 @@ systemctl list-timers ddns-cloudflare     # 다음 실행 시각
 **남는 한계:** IP 가 바뀐 뒤 최대 5 분 + DNS TTL(자동 = 300 초)만큼은 옛 주소를
 가리킵니다. 주기를 줄여도 TTL 이 하한이라 실익이 적습니다.
 
+### 11-3. 재색인 워커 (백그라운드 색인)  — `관리 계정` 세션
+
+```bash
+sudo bash $PROJECT_DIR/deploy/install-system.sh reindex
+```
+
+**무엇이 바뀌는가**
+
+예전에는 문서를 올리거나 지울 때 **그 요청 안에서** 전체 문서를 다시
+임베딩했습니다. 문서가 늘면 수십 초가 걸리는데, gunicorn 타임아웃을 넘기면
+워커가 죽어 **업로드가 500 으로 끝나고 색인은 중간 상태로 남습니다** —
+문서는 이미 저장됐는데도.
+
+```
+웹 요청 → dirty=True + 트리거 파일 touch → 즉시 반환 (실측 16ms)
+                     │
+            systemd path 유닛이 감지
+                     ▼
+     manage.py rag_reindex --if-needed   (ecobot-reindex.service)
+```
+
+유닛이 셋입니다:
+
+| 유닛 | 역할 |
+|---|---|
+| `ecobot-reindex.service` | 실제 색인 (oneshot) |
+| `ecobot-reindex.path` | 트리거 파일이 바뀌면 즉시 깨움 |
+| `ecobot-reindex.timer` | 5분 주기 안전망 — 트리거를 놓쳤거나 실패해 재시도할 때 |
+
+둘이 겹쳐 깨워도 명령 안의 **flock** 이 중복 실행을 막습니다. DB 플래그로
+락을 흉내 내지 않은 이유는, 프로세스가 죽으면 `running` 이 영구히 남아
+이후 실행이 전부 막히기 때문입니다. flock 은 프로세스가 사라지면 커널이
+알아서 풀어 줍니다.
+
+**실패해도 잃지 않습니다** — `dirty` 는 성공했을 때만 내려갑니다. 실패하면
+남아 있어 다음 타이머가 다시 시도합니다.
+
+**삭제한 문서가 재색인 전까지 인용되지 않는가?** — 안 됩니다.
+`search()` 가 DB 에 없거나 승인 상태가 아닌 `document_id` 를 결과에서
+걸러냅니다(`rag/service.py:_drop_missing_documents`). 재색인을 비동기로
+바꾸면서 생긴 창을 막는 장치입니다.
+
+```bash
+journalctl -u ecobot-reindex -f          # 색인 로그
+systemctl list-timers ecobot-reindex     # 다음 안전망 실행
+curl -s https://ecobotapt.com/rag/status/ | jq   # 진행 상태 (로그인 필요)
+```
+
+> ⚠️ 이 기능은 마이그레이션이 필요합니다. `앱 계정` 계정에서:
+> `cd $PROJECT_DIR && .venv/bin/python manage.py migrate`
+
+### 11-4. 챗봇 하루 한도
+
+`.env` 의 `CHAT_DAILY_LIMIT`(기본 50)으로 사용자당 하루 질문 수를
+제한합니다. `0` 이면 무제한이고, superuser 는 기본 면제입니다
+(`CHAT_DAILY_LIMIT_EXEMPT_STAFF`).
+
+한도를 넘기면 **HTTP 429** 와 함께 언제 초기화되는지 알려 줍니다. 차단된
+질문은 대화 기록에 남지 않습니다 — 답변 없는 질문만 쌓이면 사용자가
+혼란스러워집니다.
+
+**왜 캐시가 아니라 DB 로 세는가:** gunicorn 워커가 3개인데 Django 기본
+캐시(locmem)는 프로세스마다 따로입니다. 캐시로 세면 실효 한도가 3배가 되고,
+워커 수를 바꿀 때마다 조용히 달라집니다. `ChatLog` 는 이미 질문마다 한 행씩
+쌓이고 `created_at` 에 인덱스가 있어 그걸 세는 편이 정확합니다.
+
+> OpenAI 대시보드의 월 한도는 **"터지기 직전에 서비스 전체를 멈추는"
+> 차단기**입니다. 그것만 두면 한 명이 예산을 다 쓰고 나머지 사용자가 전부
+> 막힙니다. 둘 다 두십시오.
+
 ---
 
 ## 12. 트러블슈팅
@@ -544,6 +614,9 @@ systemctl list-timers ddns-cloudflare     # 다음 실행 시각
 | DDNS 가 조용히 안 돎 | 토큰 Zone Resources 에 그 도메인 누락 | `journalctl -u ddns-cloudflare` 확인 |
 | 인증서 갱신이 갑자기 실패 | DDNS 가 `proxied` 를 되돌려 주황 구름이 됨 | Cloudflare 에서 회색 구름으로 |
 | MySQL 접속 거부(다른 기기) | `mysql-secure` 로 로컬 제한됨 | 의도된 동작 |
+| 업로드해도 검색에 안 잡힘 | 재색인이 아직 안 돌았거나 실패 | `journalctl -u ecobot-reindex -n 30` |
+| 재색인이 계속 실패 | OpenAI 키·한도 문제 | `/rag/status/` 의 `last_error` 확인 |
+| 챗봇이 **429** 를 반환 | 하루 한도 초과 | 의도된 동작. `CHAT_DAILY_LIMIT` 조정 |
 
 ### 롤백  — `관리 계정` 세션
 

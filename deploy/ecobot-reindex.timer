@@ -1,0 +1,18 @@
+# 5분 주기 안전망.
+#
+# path 유닛이 보통 즉시 깨우지만, 알림을 놓치거나(트리거 파일 쓰기 실패)
+# 재색인이 실패해 dirty 가 남은 경우를 여기서 회수합니다.
+# --if-needed 라서 갱신할 것이 없으면 즉시 끝납니다.
+
+[Unit]
+Description=EcoBot 재색인 안전망 (5분 주기)
+Requires=ecobot-reindex.service
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

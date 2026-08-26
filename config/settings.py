@@ -351,6 +351,11 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # (통과율 93.3% · 환각률 6.7% 수치가 FAISS + _apply_quota 로 측정된 값이라
 #  벡터스토어를 교체하면 evals/ 의 3차례 측정 이력이 무효가 됩니다)
 INDEX_DIR = BASE_DIR / "vector_db"
+# 재색인 트리거. 웹 요청이 이 파일을 touch 하면 systemd path 유닛이
+# ecobot-reindex.service 를 깨웁니다(rag/tasks.py 참고). INDEX_DIR 아래에
+# 두는 이유는 systemd 유닛의 ReadWritePaths 가 이미 이 디렉터리를 허용하기
+# 때문입니다 — 다른 곳에 두면 ProtectHome=read-only 에 막힙니다.
+REINDEX_TRIGGER_FILE = INDEX_DIR / "reindex.trigger"
 # 법령 원문 txt 폴더
 LAWS_DIR = BASE_DIR / "data" / "laws"
 # 지역별 · 공통 배출 가이드 폴더
@@ -387,3 +392,14 @@ QUESTION_SUGGEST_DEDUP_THRESHOLD = _env_float("QUESTION_SUGGEST_DEDUP_THRESHOLD"
 
 # 답변 생성 시 프롬프트에 넣을 최근 대화 턴 수
 CHAT_HISTORY_TURNS = _env_int("CHAT_HISTORY_TURNS", 3)
+
+# ── 사용자별 하루 질문 한도 ──
+# 회원가입이 열려 있고 질문 1건마다 임베딩 + LLM 호출이 나가므로, 이게 없으면
+# 계정 하나로 API 비용을 무제한 태울 수 있습니다. OpenAI 대시보드의 월 한도는
+# "터지기 직전에 서비스 전체를 멈추는" 차단기이고, 이쪽은 애초에 안 터지게
+# 하는 장치입니다. 0 으로 두면 제한하지 않습니다.
+CHAT_DAILY_LIMIT = _env_int("CHAT_DAILY_LIMIT", 50)
+
+# 서비스 운영자(superuser)는 한도에서 제외합니다. 문서 검수·품질 확인처럼
+# 질문을 많이 해야 하는 작업이 막히면 곤란합니다.
+CHAT_DAILY_LIMIT_EXEMPT_STAFF = _env_bool("CHAT_DAILY_LIMIT_EXEMPT_STAFF", "True")

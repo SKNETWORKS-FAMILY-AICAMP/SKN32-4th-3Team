@@ -48,6 +48,7 @@ usage() {
   ── 배포 후 보안·운영 (선택, 순서 무관) ──
   mysql-secure  MySQL 을 127.0.0.1 로 제한
   ddns          Cloudflare DDNS 설치 (IP 변경 추적)
+  reindex       재색인 워커 설치 (백그라운드 색인)
 
 런북: $PROJECT_DIR/docs/deploy.md
 USAGE
@@ -56,7 +57,7 @@ USAGE
 # 사용법을 root 검사보다 먼저 봅니다 — 인자를 몰라서 실행해 본 사람에게
 # "root 로 실행하십시오"만 띄우면 무엇을 하라는 건지 알 수 없습니다.
 case "${1:-}" in
-    deps|db|service|caddy|all|mysql-secure|ddns) ;;
+    deps|db|service|caddy|all|mysql-secure|ddns|reindex) ;;
     *) usage; exit 1 ;;
 esac
 
@@ -326,6 +327,59 @@ MSG
 }
 
 
+install_reindex() {
+    say "재색인 워커 (백그라운드 색인)"
+    local src="$PROJECT_DIR/deploy"
+    local vdir="$PROJECT_DIR/vector_db"
+
+    [[ -x "$PROJECT_DIR/.venv/bin/python" ]] \
+        || die ".venv 가 없습니다. 앱 계정 계정에서 의존성을 먼저 설치하십시오"
+
+    # 트리거·락 파일이 여기 생깁니다. 웹 프로세스(앱 계정)가 써야 하므로
+    # 소유자를 맞춰 둡니다.
+    install -d -o "$APP_USER" -g "$APP_USER" "$vdir"
+    ok "vector_db/ 준비됨"
+
+    install -m 644 -o root -g root "$src/ecobot-reindex.service" /etc/systemd/system/
+    install -m 644 -o root -g root "$src/ecobot-reindex.path"    /etc/systemd/system/
+    install -m 644 -o root -g root "$src/ecobot-reindex.timer"   /etc/systemd/system/
+    systemctl daemon-reload
+    ok "유닛 3개 설치됨 (service · path · timer)"
+
+    # path 유닛은 감시 대상 파일이 없어도 뜨지만, 미리 만들어 두면
+    # 첫 트리거가 확실히 잡힙니다.
+    sudo -u "$APP_USER" touch "$vdir/reindex.trigger" 2>/dev/null || true
+
+    systemctl enable --now ecobot-reindex.path
+    systemctl enable --now ecobot-reindex.timer
+    ok "path · timer 활성화됨"
+
+    # 한 번 돌려서 실제로 동작하는지 봅니다. --if-needed 라서 갱신할 것이
+    # 없으면 즉시 끝납니다 — 여기서 실패하면 설정이 잘못된 것입니다.
+    systemctl start ecobot-reindex.service
+    sleep 2
+    local res
+    res=$(systemctl show ecobot-reindex.service -p Result --value)
+    if [[ $res == "success" ]]; then
+        ok "시험 실행 성공"
+    else
+        warn "시험 실행 결과: $res"
+        warn "로그:  journalctl -u ecobot-reindex -n 30 --no-pager"
+        die "재색인 워커가 정상 동작하지 않습니다"
+    fi
+
+    cat <<MSG
+
+  이제 문서 업로드·삭제가 색인을 기다리지 않습니다.
+      journalctl -u ecobot-reindex -f      # 색인 로그
+      systemctl list-timers ecobot-reindex # 다음 안전망 실행
+
+  ⚠️ 코드가 바뀌었으므로 앱 계정 계정에서 마이그레이션이 필요합니다:
+      cd $PROJECT_DIR && .venv/bin/python manage.py migrate
+MSG
+}
+
+
 case "$1" in
     deps)    install_deps ;;
     db)      install_db ;;
@@ -334,6 +388,7 @@ case "$1" in
     all)     install_deps; install_db; install_service; install_caddy ;;
     mysql-secure) secure_mysql ;;
     ddns)         install_ddns ;;
+    reindex)      install_reindex ;;
 esac
 
 say "완료"

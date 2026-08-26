@@ -107,6 +107,23 @@ class ChatAskView(LoginRequiredMixin, View):
         if not question:
             return _json({"detail": "question 이 필요합니다."}, status=400)
 
+        # ── 0. 하루 한도 ──
+        # 어떤 작업보다 먼저 봅니다. 대화방을 만들거나 질문을 저장한 뒤에
+        # 막으면, 답변 없는 질문만 기록에 남아 사용자가 혼란스러워집니다.
+        from . import ratelimit
+
+        quota = ratelimit.get_quota(request.user)
+        if quota.exceeded:
+            return _json(
+                {
+                    "detail": ratelimit.limit_message(quota),
+                    "limit": quota.limit,
+                    "used": quota.used,
+                    "remaining": 0,
+                },
+                status=429,
+            )
+
         region = body.get("region") or request.user.region
         if region not in _VALID_REGIONS:
             region = "seoul"
@@ -198,6 +215,11 @@ class ChatAskView(LoginRequiredMixin, View):
                 "sources": result.get("sources", []),
                 "suggested_questions": result.get("suggested_questions", []),
                 "law_notice": result.get("law_notice", ""),
+                # 방금 1건을 썼으므로 남은 횟수는 하나 줄어듭니다.
+                # 무제한이면 null 이라 프런트가 그대로 무시하면 됩니다.
+                "remaining": (
+                    None if quota.unlimited else max(0, quota.limit - quota.used - 1)
+                ),
             }
         )
 

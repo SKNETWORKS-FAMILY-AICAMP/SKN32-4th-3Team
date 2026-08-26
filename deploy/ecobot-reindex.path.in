@@ -1,0 +1,17 @@
+# 트리거 파일이 바뀌면 재색인 서비스를 즉시 깨웁니다.
+#
+# 웹 프로세스가 systemd 를 직접 부를 수는 없으므로(권한이 없습니다),
+# 파일 하나를 touch 하고 systemd 가 그걸 감시하는 방식을 씁니다.
+# 트리거 파일을 vector_db/ 안에 두는 이유는 ecobot.service 의
+# ReadWritePaths 가 이미 그 디렉터리를 허용하기 때문입니다 — 다른 곳에
+# 두면 ProtectHome=read-only 에 막혀 조용히 실패합니다.
+
+[Unit]
+Description=EcoBot 재색인 트리거 감시
+
+[Path]
+PathModified=@PROJECT_DIR@/vector_db/reindex.trigger
+Unit=ecobot-reindex.service
+
+[Install]
+WantedBy=multi-user.target

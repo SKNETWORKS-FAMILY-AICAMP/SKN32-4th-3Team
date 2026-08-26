@@ -230,3 +230,57 @@ class QuestionCluster(models.Model):
 
     def __str__(self):
         return f"{self.representative[:30]} ({self.count}회)"
+
+
+class ReindexState(models.Model):
+    """재색인 상태를 담는 단일 행 테이블(pk=1 고정).
+
+    왜 필요한가: 문서를 올리거나 지울 때마다 그 **요청 안에서**
+    rebuild_index() 가 전체 문서를 다시 임베딩하고 있었습니다. 문서가 늘면
+    수십 초가 걸리는데 gunicorn 기본 타임아웃은 30초라, 넘기는 순간 워커가
+    죽어 업로드는 500 으로 끝나고 색인은 중간 상태로 남습니다.
+
+    지금은 요청이 dirty 만 세우고 즉시 반환하며, 실제 작업은
+    `manage.py rag_reindex --if-needed` 가 별도 프로세스로 처리합니다
+    (systemd: ecobot-reindex). 이 표는 그 둘 사이의 유일한 약속입니다.
+
+    상태 전이:
+        idle ──request_reindex()──▶ dirty=True
+        dirty ──워커 시작──▶ RUNNING ──성공──▶ IDLE(dirty=False)
+                                    └─실패──▶ FAILED(dirty 유지 → 재시도)
+    """
+
+    class Status(models.TextChoices):
+        IDLE = "idle", "대기"
+        RUNNING = "running", "색인 중"
+        FAILED = "failed", "실패"
+
+    # 재색인이 필요한 변경이 쌓여 있는지. 워커는 성공했을 때만 내립니다 —
+    # 실패 시 유지해야 다음 실행이 다시 시도합니다.
+    dirty = models.BooleanField("갱신 대기", default=False)
+    status = models.CharField(
+        "상태", max_length=20, choices=Status.choices, default=Status.IDLE
+    )
+    # 무엇 때문에 요청됐는지. 장애 조사 때 "누가 색인을 건드렸나"의 단서.
+    reason = models.CharField("요청 사유", max_length=200, blank=True, default="")
+
+    requested_at = models.DateTimeField("요청 시각", null=True, blank=True)
+    started_at = models.DateTimeField("시작 시각", null=True, blank=True)
+    finished_at = models.DateTimeField("종료 시각", null=True, blank=True)
+
+    last_error = models.TextField("마지막 오류", blank=True, default="")
+    last_result = models.JSONField("마지막 결과", default=dict, blank=True)
+
+    class Meta:
+        db_table = "reindex_state"
+        verbose_name = "재색인 상태"
+        verbose_name_plural = "재색인 상태"
+
+    def __str__(self):
+        return f"{self.get_status_display()}" + (" (갱신 대기)" if self.dirty else "")
+
+    @classmethod
+    def get(cls):
+        """단일 행을 가져옵니다(없으면 만듭니다)."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

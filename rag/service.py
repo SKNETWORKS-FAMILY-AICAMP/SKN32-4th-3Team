@@ -276,6 +276,11 @@ def search(
     # 유사도 임계값 (환각 방지 1차 장치)
     results = [r for r in results if r.get("score", 0.0) >= min_score]
 
+    # 재색인이 백그라운드로 바뀌면서 필요해진 장치.
+    # 문서를 지워도 다음 재색인 전까지는 청크가 인덱스에 남는다.
+    # 임계값 통과 뒤(=결과가 가장 적을 때) 거른다.
+    results = _drop_missing_documents(results)
+
     # 4차 추가분: 법령 문서에 시행일 정보를 붙인다 (점수/정렬에는 영향 없음).
     results = _annotate_law_status(results)
     # 4차 2R 추가분: 단지 규정에 출처 등급·확인수·등록시점을 붙인다.
@@ -285,6 +290,48 @@ def search(
         return _apply_quota(results, region)
 
     return results[:top_k]
+
+
+def _drop_missing_documents(results: list[dict]) -> list[dict]:
+    """DB 에 없거나 승인 상태가 아닌 문서의 청크를 결과에서 제거한다.
+
+    **왜 필요한가**
+
+    문서 삭제가 예전에는 그 요청 안에서 rebuild_index() 까지 끝냈다. 지금은
+    재색인이 백그라운드라, 삭제 직후부터 재색인이 끝나기 전까지는 지운
+    문서의 청크가 인덱스에 그대로 남아 있다. 그 사이의 질문이 삭제된 문서를
+    근거로 인용하면, 3차 트러블슈팅 4번("삭제한 파일의 옛 레코드가 잘못
+    인용됨")이 그대로 재현된다.
+
+    승인 취소(status != APPROVED)도 같이 막는다. 색인 대상이 애초에
+    APPROVED 뿐이므로(_iter_documents), 기준을 맞춰 두는 편이 일관적이다.
+
+    document_id 가 없는 청크(RAG_SOURCE=files 로 만든 인덱스)는 대조할
+    대상이 없으므로 그대로 통과시킨다 — 여기서 막으면 파일 기반 인덱스가
+    통째로 비어 버린다.
+    """
+    from .models import Document
+
+    ids = {
+        r["document_id"] for r in results
+        if r.get("document_id") is not None
+    }
+    if not ids:
+        return results
+
+    alive = set(
+        Document.objects.filter(
+            pk__in=ids, status=Document.Status.APPROVED
+        ).values_list("pk", flat=True)
+    )
+    # 전부 살아 있으면(대부분의 경우) 리스트를 새로 만들지 않는다.
+    if len(alive) == len(ids):
+        return results
+
+    return [
+        r for r in results
+        if r.get("document_id") is None or r["document_id"] in alive
+    ]
 
 
 def _annotate_law_status(results: list[dict]) -> list[dict]:

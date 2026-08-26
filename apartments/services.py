@@ -93,7 +93,9 @@ def sync_rule_to_document(rule) -> None:
             rule.save(update_fields=["document"])
             Document.objects.filter(pk=old_doc_id).delete()
 
-    from rag import service
+    # 색인은 예약만 한다. 규정 승인은 관리자가 화면에서 누르는 동작이라
+    # 여기서 전체 재임베딩을 기다리면 그 요청이 그대로 붙잡힌다.
+    from rag import tasks as rag_tasks
 
-    service.rebuild_index()
+    rag_tasks.request_reindex(f"단지 규정 동기화: rule#{rule.pk}")
 

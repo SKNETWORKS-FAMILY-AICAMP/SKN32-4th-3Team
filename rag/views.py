@@ -16,7 +16,7 @@ from apartments import permissions as apt_permissions
 from apartments import scope as apt_scope
 from dashboard.views import AdminRequiredMixin
 
-from . import service
+from . import service, tasks
 from .forms import DocumentUploadForm
 from .models import Document, SourceType
 
@@ -162,20 +162,18 @@ class DocumentUploadView(LoginRequiredMixin, View):
         doc.source_key = f"upload:{doc.pk}"
         doc.save(update_fields=["content_text", "source_key"])
 
-        # 업로드 즉시 검색에 잡히도록 색인을 재구축한다.
-        try:
-            result = service.rebuild_index()
-            messages.success(
-                request,
-                f"'{doc.title}' 업로드 완료 — 문서 {result['documents']}개가 색인되었습니다.",
-            )
-        except Exception as exc:
-            # 문서는 저장됐지만 색인 실패. 3차처럼 부분 성공을 알린다.
-            messages.warning(
-                request,
-                f"'{doc.title}' 은 저장됐지만 색인에 실패했습니다: {exc} — "
-                "관리자 대시보드에서 재색인을 실행해 주세요.",
-            )
+        # 색인은 예약만 하고 즉시 반환한다.
+        #
+        # 예전에는 여기서 rebuild_index() 를 직접 불렀다. 그러면 전체 문서를
+        # 다시 임베딩하는 동안 이 요청이 붙잡혀 있고, gunicorn 타임아웃을
+        # 넘기면 워커가 죽어서 업로드가 500 으로 끝난다 — 문서는 이미
+        # 저장됐는데도. 실제 작업은 ecobot-reindex 가 맡는다(rag/tasks.py).
+        tasks.request_reindex(f"업로드: {doc.title[:60]}")
+        messages.success(
+            request,
+            f"'{doc.title}' 업로드 완료 — 색인은 백그라운드에서 갱신됩니다. "
+            "검색에 반영되기까지 잠시 걸릴 수 있습니다.",
+        )
         return redirect("rag:documents")
 
 
@@ -201,9 +199,12 @@ class DocumentDetailView(LoginRequiredMixin, View):
 
 
 class DocumentDeleteView(LoginRequiredMixin, View):
-    """문서 삭제 + 색인 재구축.
+    """문서 삭제 + 색인 갱신 예약.
 
-    삭제 후 rebuild_index() 를 부르지 않으면 지운 문서가 계속 검색됩니다
+    삭제해도 재색인 전까지는 청크가 인덱스에 남습니다. 예전에는 이 요청
+    안에서 rebuild_index() 까지 끝내 그 창을 없앴지만, 문서가 늘면
+    타임아웃에 걸려 삭제 자체가 실패했습니다. 지금은 예약만 하고,
+    그 사이의 오인용은 search() 의 _drop_missing_documents() 가 막습니다
     (3차 트러블슈팅 4번 "삭제한 파일의 옛 레코드가 잘못 인용됨"과 같은
     계열의 문제).
 
@@ -221,21 +222,43 @@ class DocumentDeleteView(LoginRequiredMixin, View):
 
         title = doc.title
         doc.delete()
-        try:
-            service.rebuild_index()
-            messages.success(request, f"'{title}' 을(를) 삭제하고 색인을 갱신했습니다.")
-        except Exception as exc:
-            messages.warning(request, f"'{title}' 은 삭제됐지만 색인 갱신에 실패했습니다: {exc}")
+        # 색인에서 빠지는 것은 재색인이 끝나야 반영되지만, 그 사이에도 지운
+        # 문서가 인용되지는 않는다 — search() 가 DB 에 없는 document_id 를
+        # 결과에서 걸러낸다(rag/service.py:_drop_missing_documents).
+        tasks.request_reindex(f"삭제: {title[:60]}")
+        messages.success(
+            request,
+            f"'{title}' 을(를) 삭제했습니다. 색인은 백그라운드에서 갱신됩니다.",
+        )
         return redirect("rag:documents")
 
 
 class IndexStatusView(LoginRequiredMixin, View):
-    """인덱스 존재 여부. 3차 GET /api/rag/status 와 응답 형식이 같습니다."""
+    """인덱스 존재 여부 + 재색인 상태.
+
+    3차 GET /api/rag/status 의 index_exists 는 그대로 두고(프런트 호환),
+    재색인이 백그라운드로 바뀌면서 필요해진 진행 상태를 덧붙입니다.
+    """
 
     def get(self, request):
         from . import vector_store
+        from .models import ReindexState
 
-        return _json({"index_exists": vector_store.index_exists()})
+        state = ReindexState.get()
+        return _json(
+            {
+                "index_exists": vector_store.index_exists(),
+                "reindex": {
+                    "status": state.status,
+                    "status_display": state.get_status_display(),
+                    "pending": state.dirty,
+                    "reason": state.reason,
+                    "requested_at": state.requested_at,
+                    "finished_at": state.finished_at,
+                    "last_error": state.last_error,
+                },
+            }
+        )
 
 
 class IndexRebuildView(AdminRequiredMixin, View):
@@ -248,10 +271,17 @@ class IndexRebuildView(AdminRequiredMixin, View):
     """
 
     def post(self, request):
-        try:
-            return _json(service.rebuild_index())
-        except Exception as exc:
-            return _json({"detail": f"인덱싱에 실패했습니다: {exc}"}, status=500)
+        # 관리자가 수동으로 누르는 버튼이지만 여기서도 기다리지 않는다.
+        # 문서가 많을수록 오래 걸리는 건 업로드와 똑같고, 관리자 화면이라고
+        # 타임아웃이 비켜 가지는 않는다.
+        tasks.request_reindex(f"수동 요청: {request.user.username}")
+        return _json(
+            {
+                "detail": "재색인을 예약했습니다. 진행 상태는 인덱스 상태에서 확인하세요.",
+                "queued": True,
+            },
+            status=202,
+        )
 
 
 class RagSearchView(AdminRequiredMixin, View):

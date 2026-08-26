@@ -1,0 +1,37 @@
+# FAISS 재색인 워커 (oneshot).
+#
+# 웹 요청은 rag.tasks.request_reindex() 로 "갱신 필요" 표시만 남기고 즉시
+# 반환합니다. 실제 임베딩은 이 유닛이 별도 프로세스로 처리합니다 —
+# 그래야 문서가 늘어도 업로드 요청이 gunicorn 타임아웃에 걸리지 않습니다.
+#
+# 깨우는 경로가 둘입니다:
+#   ecobot-reindex.path   트리거 파일이 바뀌면 즉시 (보통 이쪽)
+#   ecobot-reindex.timer  5분 주기 안전망 (알림을 놓쳤거나 실패해 재시도할 때)
+#
+# 둘이 겹쳐 깨워도 명령 안의 flock 이 중복 실행을 막습니다.
+#
+# 로그:  journalctl -u ecobot-reindex -f
+
+[Unit]
+Description=EcoBot FAISS 재색인
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@APP_USER@
+Group=@APP_USER@
+WorkingDirectory=@PROJECT_DIR@
+
+ExecStart=@PROJECT_DIR@/.venv/bin/python \
+    @PROJECT_DIR@/manage.py rag_reindex --if-needed
+
+# 임베딩 API 가 느릴 수 있습니다. 무한정 붙잡지는 않도록 상한을 둡니다.
+TimeoutStartSec=1800
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+# 인덱스·캐시·락·트리거 파일이 모두 여기에 있습니다.
+ReadWritePaths=@PROJECT_DIR@/vector_db
