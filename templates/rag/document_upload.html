@@ -6,27 +6,36 @@
     <div class="login-logo">
       <div class="logo-icon">📄</div>
       <h1>문서 업로드</h1>
-      <p class="login-subtitle">업로드한 문서는 즉시 검색 근거로 쓰입니다 (.txt, .md, .pdf)</p>
+      <p class="login-subtitle">업로드한 문서는 즉시 검색 근거로 쓰입니다 (.txt, .md, .pdf, .csv) — 여러 개를 한 번에 선택할 수 있습니다</p>
     </div>
     {% if form.non_field_errors %}<div class="form-errors-top">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>{% endif %}
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="form-group">
         <label for="id_title">문서 제목</label>
-        <input type="text" name="title" id="id_title" placeholder="예: 우리아파트 분리배출 공지"
-               value="{{ form.title.value|default:'' }}" required>
+        <input type="text" name="title" id="id_title" placeholder="예: 우리아파트 분리배출 공지 (비워두면 파일명 사용)"
+               value="{{ form.title.value|default:'' }}">
         {% for e in form.title.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
       </div>
       {% if is_service_admin %}
         <p class="login-subtitle">서비스 총괄 관리자는 문서 범위를 직접 고를 수 있습니다.</p>
         <div class="form-group">
-          <label>문서 범위</label><br>
-          <label><input type="radio" name="upload_scope" value="national"
-            {% if request.POST.upload_scope == "region" or request.POST.upload_scope == "apartment" %}{% else %}checked{% endif %}> 국가 전체(전국 공통)</label><br>
-          <label><input type="radio" name="upload_scope" value="region"
-            {% if request.POST.upload_scope == "region" %}checked{% endif %}> 지역별</label><br>
-          <label><input type="radio" name="upload_scope" value="apartment"
-            {% if request.POST.upload_scope == "apartment" %}checked{% endif %}> 특정 아파트</label>
+          <label for="id_upload_scope">문서 범위</label>
+          {% if not request.POST.upload_scope %}<p class="form-error">범위를 직접 선택해 주세요 — 자동으로 "전국 공통"이 되지 않습니다.</p>{% endif %}
+          <select name="upload_scope" id="id_upload_scope" class="region-dropdown" required>
+            <option value="">선택</option>
+            <option value="national" {% if request.POST.upload_scope == "national" %}selected{% endif %}>국가 전체(전국 공통)</option>
+            <option value="region" {% if request.POST.upload_scope == "region" %}selected{% endif %}>지역별</option>
+            <option value="apartment" {% if request.POST.upload_scope == "apartment" %}selected{% endif %}>특정 아파트</option>
+          </select>
+        </div>
+        <div class="form-group" id="scope-national-group">
+          <label for="id_national_doc_type">문서 종류</label>
+          <select name="national_doc_type" id="id_national_doc_type" class="region-dropdown">
+            <option value="guide" {% if request.POST.national_doc_type == "guide" or not request.POST.national_doc_type %}selected{% endif %}>가이드</option>
+            <option value="law" {% if request.POST.national_doc_type == "law" %}selected{% endif %}>법령</option>
+          </select>
+          <p class="login-subtitle" style="margin-top:4px">법령을 고르면 본문에서 시행일 헤더(예: [시행 2024. 1. 1.] [법률 제12345호, ...])를 자동으로 읽어 시행 여부 안내에 씁니다. 못 찾아도 업로드는 그대로 됩니다.</p>
         </div>
         <div class="form-group" id="scope-region-group">
           <label for="id_region">지역</label>
@@ -49,16 +58,17 @@
         </div>
         <script>
           (function () {
-            var radios = document.querySelectorAll('input[name="upload_scope"]');
+            var scopeSelect = document.getElementById('id_upload_scope');
+            var nationalGroup = document.getElementById('scope-national-group');
             var regionGroup = document.getElementById('scope-region-group');
             var aptGroup = document.getElementById('scope-apartment-group');
             function update() {
-              var checked = document.querySelector('input[name="upload_scope"]:checked');
-              var val = checked ? checked.value : 'national';
+              var val = scopeSelect.value;
+              nationalGroup.style.display = (val === 'national') ? '' : 'none';
               regionGroup.style.display = (val === 'region') ? '' : 'none';
               aptGroup.style.display = (val === 'apartment') ? '' : 'none';
             }
-            radios.forEach(function (r) { r.addEventListener('change', update); });
+            scopeSelect.addEventListener('change', update);
             update();
           })();
         </script>
@@ -77,9 +87,8 @@
       </div>
       {% endif %}
       <div class="form-group">
-        <label for="id_source_file">파일</label>
-        <input type="file" name="source_file" id="id_source_file" accept=".txt,.md,.pdf" required>
-        {% for e in form.source_file.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+        <label for="id_source_file">파일 (여러 개 선택 가능)</label>
+        <input type="file" name="source_file" id="id_source_file" accept=".txt,.md,.pdf,.csv" multiple required>
       </div>
       <button type="submit" class="btn btn-primary btn-full">업로드하고 색인하기</button>
     </form>

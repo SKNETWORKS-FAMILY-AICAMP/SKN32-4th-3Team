@@ -93,6 +93,7 @@ class DashboardView(AdminRequiredMixin, View):
 
     def get(self, request):
         from apartments.models import Apartment, ApartmentRule, Membership
+        from members.models import REGION_CHOICES
 
         # 관리사무소 관리자 승인 대기
         pending_managers = Membership.objects.filter(
@@ -131,6 +132,13 @@ class DashboardView(AdminRequiredMixin, View):
                 "apt_count": len(apt_data),
                 "total_residents": total_residents,
                 "total_rules": total_rules,
+                # 4차 추가분: 문서 관리 탭의 업로드 위젯이 rag:upload 로
+                # 직접 POST 한다 — 서비스 관리자는 upload_scope 를 명시
+                # 해야 하므로(rag/views.py::DocumentUploadView.post())
+                # 여기서도 지역/아파트 선택지를 내려준다. apt_data 를
+                # 그대로 재사용하고(이미 apartment 객체 보유) 지역
+                # 선택지만 추가한다.
+                "region_choices": REGION_CHOICES,
             },
         )
 
@@ -319,17 +327,36 @@ class DocumentsAPIView(AdminRequiredMixin, View):
         # 3차 admin.py 는 같은 정규식을 자리에서 다시 만들었습니다)
         from rag.service import _clean_title
 
+        # 4차 추가분: 예전엔 "제목" 문자열 하나로만 묶었다. 그런데 이제
+        # 국가 전체 업로드에서 법령/가이드를 고를 수 있게 되면서, 같은
+        # 문서를 "가이드로 이미 올렸는데 법령으로 다시 올려보자" 같은
+        # 흐름이 생겼다 — 이때 두 Document 의 title 이 똑같으면(원본
+        # 파일명이 같으면 자연히 그렇다) 여기서 한 줄로 합쳐지고, 화면엔
+        # 먼저 나온 청크의 source_type(대개 pk 가 더 작은 예전 가이드
+        # 문서)만 남아 "법령으로 새로 올렸는데 여전히 가이드로 보인다"는
+        # 착시가 생긴다 — 실제로는 법령 문서도 같이 색인은 됐지만 이
+        # 집계 화면이 둘을 하나로 뭉갠 것뿐이다. document_id 가 있으면
+        # (DB 문서) 그걸로 묶어 서로 다른 문서가 같은 제목이어도 항상
+        # 별도 줄로 보이게 한다. seed_docs 가 폴더에서 심은 문서는 DB
+        # 행이 없어 document_id 가 None 이므로(rag/service.py::
+        # _load_from_files()) 그때만 예전처럼 제목으로 묶는다.
         doc_map: dict[str, dict] = {}
         for chunk in chunks:
             title = chunk.get("title", "제목 없음")
-            if title not in doc_map:
-                doc_map[title] = {
+            doc_id = chunk.get("document_id")
+            key = f"id:{doc_id}" if doc_id is not None else f"title:{title}"
+            if key not in doc_map:
+                doc_map[key] = {
                     "title": _clean_title(title),
                     "source_type": chunk.get("source_type", "manual"),
                     "region": chunk.get("region") or "common",
                     "chunk_count": 0,
+                    # 삭제 버튼용. document_id 가 None 이면(폴더 문서)
+                    # 프론트가 삭제 버튼을 숨긴다(rag:document_delete 는
+                    # pk 가 있는 DB 행만 지울 수 있다).
+                    "document_id": doc_id,
                 }
-            doc_map[title]["chunk_count"] += 1
+            doc_map[key]["chunk_count"] += 1
 
         docs = list(doc_map.values())
         for d in docs:

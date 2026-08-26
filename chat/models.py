@@ -110,6 +110,9 @@ class ChatMessage(models.Model):
     suggested_questions = models.JSONField("추천 질문", default=list, blank=True)
     # 근거 법령 중 아직 시행 전인 것이 있을 때의 안내 문구.
     law_notice = models.TextField("법령 시행 안내", blank=True, default="")
+    # 근거를 못 찾았을 때 보여줄 연락처 카드.
+    # [{"type": "office"|"local_gov", "title":.., "phone":.., "address":.., ...}, ...]
+    contact_cards = models.JSONField("연락처 카드", default=list, blank=True)
 
     created_at = models.DateTimeField("작성일", auto_now_add=True, db_index=True)
 

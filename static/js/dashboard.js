@@ -144,7 +144,7 @@ async function loadAdminDocuments() {
 
     const tbody = document.getElementById('doc-table-body');
     if (!docs.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="stat-placeholder">문서가 없습니다.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="stat-placeholder">문서가 없습니다.</td></tr>';
       return;
     }
     const typeBadgeColors = {
@@ -155,14 +155,44 @@ async function loadAdminDocuments() {
     };
     tbody.innerHTML = docs.map(d => {
       const badge = typeBadgeColors[d.type_label] || {bg:'#F0F0EC',color:'#5A5A55'};
+      // document_id 가 없는 건 seed_docs 가 폴더에서 심은 문서라 DB 행이
+      // 없다 — 지울 pk 자체가 없으므로 삭제 버튼을 아예 안 보여준다.
+      const deleteCell = d.document_id
+        ? `<button class="btn-text" onclick="deleteAdminDocument(${d.document_id}, '${escapeHtml(d.title).replace(/'/g, "\\'")}')">삭제</button>`
+        : '';
       return `<tr>
         <td>${escapeHtml(d.title)}</td>
         <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;background:${badge.bg};color:${badge.color}">${escapeHtml(d.type_label)}</span></td>
         <td>${escapeHtml(d.region_label)}</td>
         <td>${d.chunk_count}</td>
+        <td style="text-align:right">${deleteCell}</td>
       </tr>`;
     }).join('');
   } catch (_) {}
+}
+
+// 4차 추가분: 대시보드 문서 관리 테이블에서 바로 삭제한다. 권한 판정은
+// 서버(rag/views.py::DocumentDeleteView)가 최종적으로 다시 하므로,
+// 여기서 버튼이 보였다고 해서 무조건 지워지는 건 아니다 — 예를 들어
+// 관리사무소 관리자 소유가 아닌 단지 규정이면 서버가 404 로 막는다.
+async function deleteAdminDocument(id, title) {
+  if (!confirm(`'${title}' 문서를 삭제하고 색인에서 제거할까요?`)) return;
+  // documentDeleteBase 는 "{% url 'rag:document_delete' 0 %}" 로 만든
+  // "/rag/documents/0/delete/" 형태다 — pk=0 이 경로 끝이 아니라
+  // "/delete/" 앞 중간 세그먼트라서 끝 앵커($)를 걸면 절대 안 잡힌다.
+  // (처음엔 $ 를 걸었다가 항상 원본 그대로("...documents/0/delete/")
+  // POST 돼서 삭제가 404 로 실패했다 — 그때 고친 흔적.)
+  const url = CONFIG.urls.documentDeleteBase.replace('/0/', `/${id}/`);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    });
+    if (!res.ok && res.status !== 302) throw new Error(`HTTP ${res.status}`);
+    loadAdminDocuments();
+  } catch (err) {
+    alert('삭제에 실패했습니다: ' + err.message);
+  }
 }
 
 // ===== 인덱스 재빌드 (3차 rebuildIndex + CSRF) =====
@@ -184,20 +214,89 @@ async function rebuildIndex() {
 
 // ===== 파일 업로드 =====
 // 3차 handleFileUpload 는 파일만 보냈고(제목·지역 없음) 색인도 안 됐다
-// (rag/views.py DocumentUploadView 주석 참고). 4차는 실제 폼 필드로 보낸다:
-//   title = 파일명, as_public=1 → 관리자 업로드는 공용 가이드로 색인된다.
-async function handleFileUpload(input) {
-  const file = input.files[0];
-  if (!file) return;
+// (rag/views.py DocumentUploadView 주석 참고).
+//
+// 4차 추가분(여러 파일 업로드 + 범위 버그 수정): 예전엔 as_public=1 만
+// 보내고 upload_scope 를 안 보내서, 서버가 기본값 "national" 로 채워
+// 조용히 다 가이드/전국공통으로 색인됐다. rag:upload 가 이제 upload_
+// scope 를 명시적으로 요구하므로(자동 기본값 제거) 파일을 고르면 바로
+// 올리지 않고 범위 선택 패널을 먼저 보여준다. 여러 파일은 같은
+// "source_file" 키로 각각 append 하면 서버가 request.FILES.getlist()
+// 로 한 번에 받아 파일마다 Document 를 만든다.
+let pendingUploadFiles = [];
+
+function onUploadFilesSelected(input) {
+  const fileList = Array.from(input.files || []);
+  if (!fileList.length) return;
+  pendingUploadFiles = fileList;
+
+  document.getElementById('upload-file-list').textContent =
+    fileList.length === 1
+      ? `선택한 파일: ${fileList[0].name}`
+      : `선택한 파일 ${fileList.length}개: ${fileList.map(f => f.name).join(', ')}`;
+
+  document.getElementById('doc-upload-scope').value = '';
+  document.getElementById('doc-upload-national-group').classList.add('hidden');
+  document.getElementById('doc-upload-region-group').classList.add('hidden');
+  document.getElementById('doc-upload-apartment-group').classList.add('hidden');
+  document.getElementById('upload-scope-error').classList.add('hidden');
+  document.getElementById('upload-scope-panel').classList.remove('hidden');
+}
+
+document.getElementById('doc-upload-scope').addEventListener('change', function () {
+  const val = this.value;
+  document.getElementById('doc-upload-national-group').classList.toggle('hidden', val !== 'national');
+  document.getElementById('doc-upload-region-group').classList.toggle('hidden', val !== 'region');
+  document.getElementById('doc-upload-apartment-group').classList.toggle('hidden', val !== 'apartment');
+  document.getElementById('upload-scope-error').classList.add('hidden');
+});
+
+function cancelAdminUpload() {
+  pendingUploadFiles = [];
+  document.getElementById('file-input').value = '';
+  document.getElementById('upload-scope-panel').classList.add('hidden');
+}
+
+async function submitAdminUpload() {
+  if (!pendingUploadFiles.length) return;
+  const scope = document.getElementById('doc-upload-scope').value;
+  if (!scope) {
+    document.getElementById('upload-scope-error').textContent = '범위를 선택해 주세요.';
+    document.getElementById('upload-scope-error').classList.remove('hidden');
+    return;
+  }
+  const region = document.getElementById('doc-upload-region').value;
+  const targetApartment = document.getElementById('doc-upload-apartment').value;
+  if (scope === 'region' && !region) {
+    document.getElementById('upload-scope-error').textContent = '지역을 선택해 주세요.';
+    document.getElementById('upload-scope-error').classList.remove('hidden');
+    return;
+  }
+  if (scope === 'apartment' && !targetApartment) {
+    document.getElementById('upload-scope-error').textContent = '아파트를 선택해 주세요.';
+    document.getElementById('upload-scope-error').classList.remove('hidden');
+    return;
+  }
+
+  const files = pendingUploadFiles;
   const progress = document.getElementById('upload-progress');
   const progressText = document.getElementById('upload-progress-text');
+  document.getElementById('upload-scope-panel').classList.add('hidden');
   progress.classList.remove('hidden');
-  progressText.textContent = `'${file.name}' 업로드 및 색인 중... (문서 양에 따라 수십 초 걸릴 수 있습니다)`;
+  progressText.textContent =
+    files.length === 1
+      ? `'${files[0].name}' 업로드 및 색인 중... (문서 양에 따라 수십 초 걸릴 수 있습니다)`
+      : `${files.length}개 파일 업로드 및 색인 중... (문서 양에 따라 수십 초 걸릴 수 있습니다)`;
+
+  const nationalDocType = document.getElementById('doc-upload-national-type').value;
 
   const form = new FormData();
-  form.append('source_file', file);
-  form.append('title', file.name.replace(/\.[^.]+$/, ''));
-  form.append('as_public', '1');
+  files.forEach(file => form.append('source_file', file));
+  form.append('title', '');
+  form.append('upload_scope', scope);
+  if (scope === 'national') form.append('national_doc_type', nationalDocType);
+  if (scope === 'region') form.append('region', region);
+  if (scope === 'apartment') form.append('target_apartment', targetApartment);
 
   try {
     const res = await fetch(CONFIG.urls.upload, {
@@ -211,7 +310,8 @@ async function handleFileUpload(input) {
   } catch (err) {
     progressText.textContent = '업로드 실패: ' + err.message;
   } finally {
-    input.value = '';
+    pendingUploadFiles = [];
+    document.getElementById('file-input').value = '';
     setTimeout(() => progress.classList.add('hidden'), 2500);
   }
 }

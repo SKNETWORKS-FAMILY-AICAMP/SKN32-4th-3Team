@@ -70,6 +70,7 @@ async function restoreAllSessions() {
           sources: m.sources || [],
           suggested_questions: m.suggested_questions || [],
           law_notice: m.law_notice || '',
+          contact_cards: m.contact_cards || [],
         })),
       };
     });
@@ -203,9 +204,15 @@ function renderMessages() {
       ? `<div class="chat-source-row">출처 ${uniqueSources.map(s => `<span class="chat-source-item">${escapeHtml(s)}</span>`).join('<span class="chat-source-sep">·</span>')}</div>`
       : '';
 
-    // ── 법령 (muted 한 줄) ──
+    // ── 시행 예정 법령 안내 (실천 팁 카드와 같은 패턴으로 눈에 띄게) ──
+    // msg.law_notice 는 이미 "⚠ 다음 법령은 아직..." 처럼 ⚠ 로 시작한다
+    // (rag/service.py::_law_notice()) — 라벨에도 아이콘을 넣으므로
+    // 본문 앞의 ⚠ 는 중복되지 않게 떼고 보여준다.
     const lawHtml = msg.law_notice
-      ? `<div class="chat-law-text">${escapeHtml(msg.law_notice)}</div>`
+      ? `<div class="chat-law-notice-card">
+           <div class="chat-law-notice-label">⚠️ 시행 예정 법령 안내</div>
+           <p class="chat-law-notice-text">${escapeHtml(msg.law_notice.replace(/^⚠\s*/, ''))}</p>
+         </div>`
       : '';
 
     // ── 추천 질문 ──
@@ -218,6 +225,28 @@ function renderMessages() {
          </div>`
       : '';
 
+    // ── 연락처 카드 (관리사무소 · 지자체) ──
+    const cardsHtml = (msg.contact_cards && msg.contact_cards.length)
+      ? `<div class="chat-contact-cards">${msg.contact_cards.map(c => {
+           const icon = c.type === 'local_gov' ? '🏛️' : '🏢';
+           const subtitle = c.type === 'local_gov' ? (c.department || '지자체') : '관리사무소';
+           const rows = [];
+           if (c.phone) rows.push(`<div class="contact-card-row">📞 ${escapeHtml(c.phone)}</div>`);
+           if (c.address) rows.push(`<div class="contact-card-row">📍 ${escapeHtml(c.address)}</div>`);
+           if (c.hours) rows.push(`<div class="contact-card-row">🕐 ${escapeHtml(c.hours)}</div>`);
+           return `<div class="contact-card">
+             <div class="contact-card-head">
+               <span class="contact-card-icon">${icon}</span>
+               <div>
+                 <div class="contact-card-title">${escapeHtml(c.title || subtitle)}</div>
+                 <div class="contact-card-subtitle">${escapeHtml(subtitle)}</div>
+               </div>
+             </div>
+             ${rows.join('')}
+           </div>`;
+         }).join('')}</div>`
+      : '';
+
     return `
       <div class="message bot">
         <div class="message-avatar bot-avatar-msg">🌿</div>
@@ -226,6 +255,7 @@ function renderMessages() {
           ${tipHtml}
           ${sourcesHtml}
           ${lawHtml}
+          ${cardsHtml}
           ${suggestHtml}
         </div>
       </div>`;
@@ -298,6 +328,7 @@ async function askBackend(question) {
         sources: data.sources || [],
         suggested_questions: data.suggested_questions || [],
         law_notice: data.law_notice || '',
+        contact_cards: data.contact_cards || [],
       });
     }
   } catch (err) {
