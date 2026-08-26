@@ -252,6 +252,62 @@ Cloudflare 계정이라 토큰 하나로 처리된다.
 중요해졌다. 주간 자동 정리 타이머는 **선택**으로 두었다 — 시그널이 제
 역할을 하면 지울 것이 없어서, 자동 삭제를 굳이 켤 이유가 크지 않다.
 
+## 결정 12 — 줄바꿈은 main 관례(LF)를 따른다 (2026-08-26 추가)
+
+2026-08-26 forksync 병합에서 나왔다. `origin/main` 을
+`deploy/ecobotapt` 에 합치는데 git 이 충돌 3건을 냈고, 그중
+`rag/service.py` 가 **2,129줄 = 파일 전체**였다.
+
+**진단.** 실제로 겹치는 변경이 아니었다. 이 저장소는 줄바꿈이 파일마다
+다른데(Windows 에서 작업한 파일이 CRLF), 저쪽이 이 파일을 CRLF→LF 로
+**통째 변환**해 두었다. base=CRLF · ours=CRLF · theirs=LF 라 모든 줄이
+바뀐 것으로 잡힌다. `--ignore-cr-at-eol` 로 재면 저쪽 실변경은 297줄이고,
+우리 변경 구간(38·42·278·289·446행)과 **한 줄도 겹치지 않는다.**
+
+**해법은 두 단계다.** 하나만 해서는 안 된다.
+
+```bash
+# ① 가짜 충돌을 없애고 병합한다
+git merge origin/main -Xignore-cr-at-eol
+
+# ② 결과가 CRLF 963 + LF 265 로 섞이므로 LF 로 통일한다
+python3 -c "from pathlib import Path; p=Path('rag/service.py'); p.write_bytes(p.read_bytes().replace(b'\r\n', b'\n'))"
+```
+
+②를 빠뜨리면 한 파일 안에서 줄바꿈이 섞인 채로 커밋된다 — 다음 사람이
+편집기로 저장하는 순간 어느 쪽으로든 정규화되어 또 파일 전체 diff 가 된다.
+
+**검토했다가 버린 대안:**
+
+| 대안 | 안 통한 이유 |
+|---|---|
+| 그냥 `git merge` 하고 손으로 해소 | 2,129줄을 손으로 재작성해야 한다. 실질적으로 불가능하고, 그 과정에서 양쪽 변경을 잃는다 |
+| `-Xtheirs` 로 파일 전체를 저쪽 것으로 | 우리 변경 100줄(`_drop_missing_documents`·`_retrieval_error_message`)이 조용히 사라진다. 충돌이 안 나므로 **알아채지도 못한다** |
+| CRLF 를 유지(저쪽을 CRLF 로 되돌림) | 저쪽 관례가 이미 LF 다. 되돌리면 forksync 할 때마다 이 파일 전체가 다시 충돌한다. 이번 한 번의 큰 diff 를 매번 치르는 셈 |
+| `.gitattributes` 로 저장소 전체 정규화 | 옳은 방향이지만 **기존 파일 전체가 한 번에 바뀐다.** 팀이 각자 브랜치를 들고 있는 시점에 하면 모두의 병합이 동시에 터진다. 브랜치가 정리된 뒤 별건으로 |
+
+**`chat/models.py` 는 왜 안 건드렸나.** 이 파일도 섞여 있다(CRLF 174 /
+LF 3). 하지만 그건 **`origin/main` 자체의 상태**고, 우리 병합 결과가 main
+과 바이트 단위로 같다. LF 로 통일하면 오히려 main 과 파일 전체가 어긋나
+다음 forksync 에서 충돌이 새로 생긴다. **기준은 "섞였으니 고친다"가 아니라
+"main 과 어긋나지 않는다"이다.**
+
+**대가.** 이번 커밋에서 `rag/service.py` 의 diff 가 파일 전체로 잡힌다 —
+리뷰가 불가능하고 `git blame` 이 이 커밋에서 끊긴다. 한 번만 치르는
+비용이지만 공짜는 아니다. 그리고 Windows 에서 작업하는 팀원이 이 파일을
+다시 CRLF 로 저장하면 그대로 재발한다 — `.gitattributes` 없이는 **git 이
+막아 주지 않는다.**
+
+**같이 겪은 것 — git 이 아예 못 보는 충돌.** 같은 병합에서 양쪽이
+`rag/migrations/0003_*` 을 각각 만들었다(`0003_reindexstate` ·
+`0003_alter_document_region`, 둘 다 부모가 `rag.0002`). **파일명이 다르니
+git 은 조용히 둘 다 받아들이고**, Django 가 실행 시점에 거부한다:
+`Conflicting migrations detected; multiple leaf nodes`. 우리 쪽 0003 은
+운영 DB 에 이미 적용돼 있어 파일명을 0004 로 바꾸면 적용 기록과 어긋나므로
+(테이블 중복 생성 시도), `makemigrations --merge` 로 빈 `0004_merge_*` 를
+두는 정석을 따랐다. **병합 뒤에는 `manage.py makemigrations --check` 를
+반드시 돌린다** — git 이 깨끗하다고 코드가 도는 것은 아니다.
+
 ## 남겨둔 위험
 
 배포 시점(2026-08-26)에 적어 둔 셋은 모두 처리했다.
