@@ -48,6 +48,13 @@ python manage.py seed_apartments
 python manage.py runserver
 ```
 
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py seed_docs
+python manage.py rag_reindex
+python manage.py seed_apartments
+python manage.py runserver
+
 ### 주요 URL
 
 | URL | 설명 |
