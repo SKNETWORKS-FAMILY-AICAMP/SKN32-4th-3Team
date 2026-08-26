@@ -10,6 +10,7 @@ urlpatterns = [
     path("join/", views.ApartmentJoinView.as_view(), name="join"),
     path("manager/apply/", views.ManagerApplyView.as_view(), name="manager_apply"),
     path("mine/", views.MyApartmentView.as_view(), name="mine"),
+    path("manager-dashboard/", views.ManagerDashboardView.as_view(), name="manager_dashboard"),
     path("switch/<int:pk>/", views.ApartmentSwitchView.as_view(), name="switch"),
     path("membership/queue/", views.MembershipQueueView.as_view(), name="membership_queue"),
     path("membership/residents/", views.ResidentApprovalQueueView.as_view(), name="resident_queue"),

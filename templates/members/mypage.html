@@ -20,6 +20,10 @@
         <div class="mp-name">{{ user.nickname|default:user.display_name }}</div>
         <div class="mp-email">{{ user.email }}</div>
       </div>
+      <form method="post" action="{% url 'members:logout' %}" style="margin-left:auto">
+        {% csrf_token %}
+        <button type="submit" class="mp-logout-top-btn">로그아웃</button>
+      </form>
     </div>
 
     <!-- 탭 -->
@@ -111,6 +115,9 @@
         <div class="mp-apt-list-title" style="margin-top:16px">바로가기</div>
         <div class="mp-shortcut-row">
           <a class="mp-btn-sm" href="{% url 'apartments:rule_list' %}">단지 규정</a>
+          {% if is_manager %}
+          <a class="mp-btn-sm" href="{% url 'apartments:manager_dashboard' %}" style="font-weight:600">🛠 단지 관리</a>
+          {% endif %}
           {% if user.is_service_admin %}
           <a class="mp-btn-sm" href="{% url 'apartments:membership_queue' %}">관리자 승인 큐</a>
           <a class="mp-btn-sm" href="{% url 'apartments:manager_roster' %}">관리자 명단</a>
@@ -211,10 +218,6 @@
         <div class="mp-settings-title">계정</div>
         <div class="mp-settings-links">
           <a href="{% url 'members:profile_edit' %}" class="mp-settings-link mp-settings-link-primary">프로필 수정</a>
-          <form method="post" action="{% url 'members:logout' %}" style="display:inline">
-            {% csrf_token %}
-            <button type="submit" class="mp-settings-link mp-logout-btn">로그아웃</button>
-          </form>
           <a href="{% url 'members:withdraw' %}" class="mp-settings-link mp-text-danger">회원 탈퇴</a>
         </div>
       </div>
