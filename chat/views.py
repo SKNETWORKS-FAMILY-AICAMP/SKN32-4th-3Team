@@ -64,24 +64,23 @@ class ChatRoomView(LoginRequiredMixin, View):
     def get(self, request):
         from apartments import permissions as apt_permissions, scope as apt_scope
 
-        apartment = apt_scope.current_apartment(request)
-        membership = apt_scope.current_membership(request)
+        # 사이드바 단지명: 미승인(신청 중)이어도 표시
+        chat_membership = apt_scope.current_membership_for_chat(request)
+        chat_apartment = chat_membership.apartment if chat_membership else None
+        # 커뮤니티 접근·관리 권한: 승인된 소속 기준
+        approved_membership = apt_scope.current_membership(request)
 
         return render(
             request,
             "chat/room.html",
             {
                 "regions": SELECTABLE_REGIONS,
-                # 회원 프로필의 거주 지역이 드롭다운 기본값이 됩니다.
-                # (3차는 새로고침하면 서울로 리셋되던 부분)
                 "default_region": request.user.region if request.user.region in _VALID_REGIONS else "seoul",
-                # design 변경(2R-2): 승인된 단지 소속(또는 서비스 운영자)이
-                # 없으면 커뮤니티 진입 버튼 자체를 숨긴다.
                 "can_access_community": apt_permissions.has_community_access(request),
-                # 4차 UI 리디자인: 사이드바에 단지명·역할 표시
-                "apartment_name": str(apartment) if apartment else None,
-                "membership_role": membership.get_role_display() if membership else None,
-                "is_manager": bool(membership and membership.role == "manager"),
+                # 4차 UI 리디자인: 사이드바에 단지명·역할 표시 (신청 중도 보임)
+                "apartment_name": str(chat_apartment) if chat_apartment else None,
+                "membership_role": chat_membership.get_role_display() if chat_membership else None,
+                "is_manager": bool(approved_membership and approved_membership.role == "manager"),
             },
         )
 
@@ -177,7 +176,7 @@ class ChatAskView(LoginRequiredMixin, View):
             log.save(update_fields=["cluster"])
 
         # ── 6. 답변 저장 ──
-        ChatMessage.objects.create(
+        bot_msg = ChatMessage.objects.create(
             session=session,
             role=ChatMessage.Role.ASSISTANT,
             content=result.get("answer", ""),
@@ -192,6 +191,7 @@ class ChatAskView(LoginRequiredMixin, View):
         return _json(
             {
                 "session_id": str(session.pk),
+                "message_id": bot_msg.pk,
                 "answer": result.get("answer", ""),
                 "tip": result.get("tip", ""),
                 "source": result.get("source", ""),
@@ -243,6 +243,8 @@ class ChatSessionListView(LoginRequiredMixin, View):
                             # 4차 추가분: 새로고침 후 복원에도 같이 실어 보낸다.
                             "suggested_questions": m.suggested_questions,
                             "law_notice": m.law_notice,
+                            "feedback": m.feedback,
+                            "message_id": m.pk,
                             "created_at": m.created_at.isoformat(),
                         }
                         for m in s.messages.all()
@@ -263,6 +265,31 @@ class ChatSessionDeleteView(LoginRequiredMixin, View):
         session = get_object_or_404(ChatSession, pk=pk, owner=request.user)
         session.delete()
         return _json({"deleted": True})
+
+
+class ChatFeedbackView(LoginRequiredMixin, View):
+    """답변 피드백(좋아요/싫어요) 저장. POST 전용."""
+
+    def post(self, request, pk):
+        import json
+        from django.utils import timezone
+
+        message = get_object_or_404(
+            ChatMessage, pk=pk, session__owner=request.user, role=ChatMessage.Role.ASSISTANT,
+        )
+        try:
+            body = json.loads(request.body)
+        except (json.JSONDecodeError, ValueError):
+            return _json({"error": "invalid body"}, status=400)
+
+        feedback = body.get("feedback")
+        if feedback not in ("positive", "negative", None):
+            return _json({"error": "invalid feedback value"}, status=400)
+
+        message.feedback = feedback
+        message.feedback_at = timezone.now() if feedback else None
+        message.save(update_fields=["feedback", "feedback_at"])
+        return _json({"ok": True, "feedback": feedback})
 
 
 class PopularQuestionView(LoginRequiredMixin, View):

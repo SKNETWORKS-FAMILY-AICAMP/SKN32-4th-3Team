@@ -50,6 +50,45 @@
         <p class="stat-placeholder">데이터 로딩 중...</p>
       </div>
     </div>
+
+    <!-- 만족도 통계 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px;margin-bottom:12px;">
+      <h3 style="margin:0;">답변 피드백</h3>
+      <select id="feedback-apt-filter" onchange="loadFeedbackStats()" style="padding:4px 10px;border-radius:6px;border:1px solid #D5D5CF;font-size:13px;color:#3A3A35;background:#fff;">
+        <option value="">전체 (전국 통합)</option>
+        {% for item in apt_data %}
+        <option value="{{ item.apartment.pk }}">{{ item.apartment.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="stats-grid" id="feedback-cards">
+      <div class="stat-card"><p class="stat-label">전체 피드백</p><p class="stat-value" id="fb-total">-</p></div>
+      <div class="stat-card"><p class="stat-label">만족 비율</p><p class="stat-value green" id="fb-rate">-</p></div>
+      <div class="stat-card"><p class="stat-label">👍 좋아요</p><p class="stat-value green" id="fb-positive">-</p></div>
+      <div class="stat-card"><p class="stat-label">👎 싫어요</p><p class="stat-value red" id="fb-negative">-</p></div>
+    </div>
+
+    <div class="stats-columns" style="margin-top:16px;">
+      <div class="stats-section">
+        <h3>답변 만족도</h3>
+        <div id="feedback-bar-container">
+          <p class="stat-placeholder">데이터 로딩 중...</p>
+        </div>
+      </div>
+      <div class="stats-section">
+        <h3>지역별 만족도</h3>
+        <div id="feedback-region-container">
+          <p class="stat-placeholder">데이터 로딩 중...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-section" style="margin-top:16px;">
+      <h3>최근 부정 피드백</h3>
+      <div id="feedback-neg-container">
+        <p class="stat-placeholder">데이터 로딩 중...</p>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ 탭 2: 단지 관리 ═══ -->
@@ -167,7 +206,8 @@
     "dailyTrend": "{% url 'dashboard:daily_trend' %}",
     "documents": "{% url 'dashboard:documents' %}",
     "rebuild": "{% url 'rag:rebuild' %}",
-    "upload": "{% url 'rag:upload' %}"
+    "upload": "{% url 'rag:upload' %}",
+    "feedbackStats": "{% url 'dashboard:feedback_stats' %}"
   }
 }
 </script>

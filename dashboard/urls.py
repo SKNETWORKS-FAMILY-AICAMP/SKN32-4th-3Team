@@ -20,4 +20,5 @@ urlpatterns = [
     path("region-stats/", views.RegionStatsAPIView.as_view(), name="region_stats"),
     path("daily-trend/", views.DailyTrendAPIView.as_view(), name="daily_trend"),
     path("documents/", views.DocumentsAPIView.as_view(), name="documents"),
+    path("feedback-stats/", views.FeedbackStatsAPIView.as_view(), name="feedback_stats"),
 ]

@@ -37,8 +37,28 @@ class HomeView(View):
     def get(self, request):
         from boards.models import Board
 
-        recent_boards = Board.objects.select_related("author").order_by("-created_at")[:5]
-        return render(request, "home.html", {"recent_boards": recent_boards})
+        recent_boards = Board.objects.none()
+        has_community = False
+        is_manager = False
+        if request.user.is_authenticated:
+            from apartments.scope import current_apartment
+            from apartments.models import Membership
+            apt = current_apartment(request)
+            if apt:
+                has_community = True
+                recent_boards = Board.objects.filter(
+                    apartment=apt, is_hidden=False,
+                ).select_related("author").order_by("-created_at")[:5]
+                is_manager = Membership.objects.filter(
+                    member=request.user, apartment=apt,
+                    role=Membership.Role.MANAGER,
+                    status=Membership.Status.APPROVED,
+                ).exists()
+        return render(request, "home.html", {
+            "recent_boards": recent_boards,
+            "has_community": has_community,
+            "is_manager": is_manager,
+        })
 
 
 class GuideView(View):

@@ -39,6 +39,15 @@ class BoardForm(forms.ModelForm):
             "attachment": "첨부파일 (선택)",
         }
 
+    def __init__(self, *args, is_manager=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not is_manager:
+            # 일반 사용자에게는 공지 카테고리를 숨긴다
+            self.fields["category"].choices = [
+                (k, v) for k, v in self.fields["category"].choices
+                if k != "notice"
+            ]
+
     def clean_attachment(self):
         uploaded = self.cleaned_data.get("attachment")
         # 첨부는 선택 사항 — 수정 화면에서 기존 파일 유지(FieldFile)면 통과.

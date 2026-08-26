@@ -289,6 +289,83 @@ class DailyTrendAPIView(AdminRequiredMixin, View):
         return _json(result)
 
 
+class FeedbackStatsAPIView(AdminRequiredMixin, View):
+    """답변 만족도 통계. 피드백 요약 + 최근 부정 피드백 목록."""
+
+    def get(self, request):
+        from chat.models import ChatMessage
+
+        msgs = ChatMessage.objects.filter(role=ChatMessage.Role.ASSISTANT)
+
+        # 아파트별 필터 (쿼리 파라미터 ?apartment=<id>)
+        apt_id = request.GET.get("apartment")
+        if apt_id:
+            msgs = msgs.filter(session__apartment_id=apt_id)
+
+        positive = msgs.filter(feedback="positive").count()
+        negative = msgs.filter(feedback="negative").count()
+        total_fb = positive + negative
+        rate = round(positive / total_fb * 100) if total_fb > 0 else 0
+
+        # 최근 부정 피드백 10건 (질문-답변 쌍)
+        recent_neg = (
+            msgs.filter(feedback="negative")
+            .select_related("session")
+            .order_by("-feedback_at")[:10]
+        )
+        neg_list = []
+        for m in recent_neg:
+            # 직전 사용자 메시지 찾기
+            user_msg = (
+                ChatMessage.objects.filter(
+                    session=m.session,
+                    role=ChatMessage.Role.USER,
+                    created_at__lt=m.created_at,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            neg_list.append({
+                "question": user_msg.content[:80] if user_msg else "",
+                "answer": m.content[:80],
+                "date": m.feedback_at.strftime("%m.%d") if m.feedback_at else "",
+            })
+
+        # 지역별 만족도
+        region_fb = (
+            msgs.filter(feedback__isnull=False)
+            .values("session__region", "feedback")
+            .annotate(cnt=Count("id"))
+        )
+        region_map = {}  # {region: {positive: N, negative: N}}
+        for row in region_fb:
+            r = row["session__region"]
+            if r not in region_map:
+                region_map[r] = {"positive": 0, "negative": 0}
+            region_map[r][row["feedback"]] = row["cnt"]
+
+        region_stats = []
+        for r, counts in sorted(region_map.items(), key=lambda x: -(x[1]["positive"] + x[1]["negative"])):
+            total_r = counts["positive"] + counts["negative"]
+            region_stats.append({
+                "region": r,
+                "label": REGION_LABELS.get(r, r),
+                "positive": counts["positive"],
+                "negative": counts["negative"],
+                "total": total_r,
+                "rate": round(counts["positive"] / total_r * 100) if total_r > 0 else 0,
+            })
+
+        return _json({
+            "total": total_fb,
+            "positive": positive,
+            "negative": negative,
+            "rate": rate,
+            "recent_negative": neg_list,
+            "by_region": region_stats,
+        })
+
+
 class DocumentsAPIView(AdminRequiredMixin, View):
     """색인된 문서 목록과 청크 수. 3차 GET /api/admin/documents 대응.
 

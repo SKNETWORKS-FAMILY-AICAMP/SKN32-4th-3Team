@@ -631,6 +631,24 @@ body {
   color: var(--color-primary);
 }
 
+/* Feedback Buttons */
+.chat-feedback {
+  display: flex; gap: 4px; margin-top: 8px;
+}
+.chat-fb-btn {
+  background: none; border: 1px solid var(--color-border);
+  border-radius: 16px; padding: 3px 10px; font-size: 13px;
+  cursor: pointer; transition: all .15s;
+  color: var(--color-text-secondary); line-height: 1.4;
+}
+.chat-fb-btn:hover {
+  border-color: var(--color-primary); background: var(--color-surface);
+}
+.chat-fb-btn.active {
+  border-color: var(--color-primary); background: #E8F5EE;
+  color: var(--color-primary);
+}
+
 /* Typing Indicator */
 .typing-indicator {
   display: flex;
@@ -1240,15 +1258,15 @@ body {
   gap: 8px;
 }
 .land-regions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 .land-region {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 10px 14px;
   background: #FAFAF8;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius);
@@ -1265,13 +1283,19 @@ body {
   color: var(--color-primary);
   font-size: 12px;
   font-weight: 500;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.land-region:hover .land-region-go {
+  opacity: 1;
 }
 .land-rdot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   display: inline-block;
-  margin-right: 8px;
+  flex-shrink: 0;
 }
 .land-info-list {
   display: flex;
@@ -1386,6 +1410,19 @@ body {
   font-size: 11px; padding: 3px 8px; border-radius: 4px;
   background: var(--color-primary-light); color: var(--color-primary-dark);
   font-weight: 500; white-space: nowrap; flex-shrink: 0;
+}
+.land-badge-notice {
+  font-size: 11px; padding: 3px 8px; border-radius: 4px;
+  background: #FCEBEB; color: #A32D2D;
+  font-weight: 600; white-space: nowrap; flex-shrink: 0;
+}
+.land-community-row-notice {
+  background: #F6FAF0; border: 1px solid #D5E6C0; border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 4px; border-bottom: none;
+}
+.land-community-row-notice .land-community-post-title { font-weight: 600; }
+.land-community-row-notice .land-badge-notice {
+  background: #FCEBEB; color: #A32D2D;
 }
 .land-community-post-title {
   font-size: 14px; color: var(--color-text); text-decoration: none;
@@ -1914,6 +1951,8 @@ body {
 .comm-pill.active {
   background: var(--color-primary); color: #fff; border-color: var(--color-primary);
 }
+.comm-pill.pill-notice { border-color: #F5C6C6; color: #A32D2D; background: #FCEBEB; }
+.comm-pill.pill-notice.active { background: #A32D2D; color: #fff; border-color: #A32D2D; }
 .comm-pill.pill-question { border-color: #B5D4F4; color: #185FA5; background: #E6F1FB; }
 .comm-pill.pill-question.active { background: #185FA5; color: #fff; border-color: #185FA5; }
 .comm-pill.pill-info { border-color: #9FE1CB; color: #0F6E56; background: #E1F5EE; }
@@ -1926,6 +1965,34 @@ body {
   padding: 7px 12px; font-size: 13px;
   border: 1px solid var(--color-border); border-radius: var(--radius);
   background: var(--color-surface); outline: none;
+}
+
+/* -- Notice banner -- */
+.comm-notice-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; margin-bottom: 8px;
+  background: #F6FAF0; border: 1px solid #D5E6C0; border-radius: 10px;
+  text-decoration: none; color: var(--color-text);
+  transition: background 0.15s;
+}
+.comm-notice-banner:hover { background: #EDF5E0; }
+.comm-notice-left {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 0; flex: 1;
+}
+.comm-notice-new {
+  font-size: 10px; font-weight: 700; color: #E53E3E;
+  background: #FFF0F0; padding: 2px 6px; border-radius: 4px;
+  letter-spacing: 0.5px; flex-shrink: 0;
+}
+.comm-notice-title {
+  font-size: 14px; font-weight: 600; color: var(--color-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.comm-notice-right {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--color-text-secondary);
+  flex-shrink: 0; margin-left: 16px;
 }
 
 /* -- Card grid -- */
@@ -1949,6 +2016,7 @@ body {
   display: inline-block;
 }
 .badge-hidden { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB; }
+.badge-notice { background: #FCEBEB; color: #A32D2D; font-weight: 600; }
 .badge-hot { background: #FAECE7; color: #993C1D; }
 .badge-question { background: #E6F1FB; color: #185FA5; }
 .badge-info { background: #E1F5EE; color: #0F6E56; }

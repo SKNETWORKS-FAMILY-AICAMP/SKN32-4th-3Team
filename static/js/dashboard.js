@@ -216,9 +216,90 @@ async function handleFileUpload(input) {
   }
 }
 
+// ===== 만족도 통계 =====
+async function loadFeedbackStats() {
+  try {
+    let url = CONFIG.urls.feedbackStats;
+    const aptFilter = document.getElementById('feedback-apt-filter');
+    if (aptFilter && aptFilter.value) {
+      url += '?apartment=' + encodeURIComponent(aptFilter.value);
+    }
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const d = await res.json();
+
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('fb-total', d.total.toLocaleString());
+    set('fb-rate', d.rate + '%');
+    set('fb-positive', d.positive.toLocaleString());
+    set('fb-negative', d.negative.toLocaleString());
+
+    // 만족도 바
+    const barContainer = document.getElementById('feedback-bar-container');
+    if (d.total === 0) {
+      barContainer.innerHTML = '<p class="stat-placeholder">피드백 데이터가 없습니다.</p>';
+    } else {
+      const posRate = d.rate;
+      const negRate = 100 - posRate;
+      barContainer.innerHTML = `
+        <div style="display:flex;border-radius:6px;overflow:hidden;height:28px;margin-bottom:8px">
+          <div style="width:${posRate}%;background:#97C459;display:flex;align-items:center;justify-content:center">
+            <span style="font-size:12px;font-weight:600;color:#173404">${posRate}%</span>
+          </div>
+          <div style="width:${negRate}%;background:#F09595;display:flex;align-items:center;justify-content:center">
+            <span style="font-size:12px;font-weight:600;color:#501313">${negRate}%</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;font-size:13px;color:#6B6B65">
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#97C459;margin-right:4px;vertical-align:middle"></span>좋아요 ${d.positive}건</span>
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F09595;margin-right:4px;vertical-align:middle"></span>싫어요 ${d.negative}건</span>
+        </div>`;
+    }
+
+    // 지역별 만족도
+    const regionContainer = document.getElementById('feedback-region-container');
+    if (!d.by_region || !d.by_region.length) {
+      regionContainer.innerHTML = '<p class="stat-placeholder">지역별 피드백 데이터가 없습니다.</p>';
+    } else {
+      regionContainer.innerHTML = d.by_region.map(r => {
+        const posW = r.total > 0 ? Math.max(r.rate, 3) : 0;
+        const negW = r.total > 0 ? Math.max(100 - r.rate, 3) : 0;
+        return `<div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+            <span style="font-weight:500">${escapeHtml(r.label)}</span>
+            <span style="color:#6B6B65">${r.rate}% (${r.total}건)</span>
+          </div>
+          <div style="display:flex;border-radius:4px;overflow:hidden;height:14px">
+            <div style="width:${posW}%;background:#97C459"></div>
+            <div style="width:${negW}%;background:#F09595"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // 최근 부정 피드백
+    const negContainer = document.getElementById('feedback-neg-container');
+    if (!d.recent_negative.length) {
+      negContainer.innerHTML = '<p class="stat-placeholder">부정 피드백이 없습니다.</p>';
+    } else {
+      negContainer.innerHTML = d.recent_negative.map((item, i) => `
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;${i < d.recent_negative.length - 1 ? 'border-bottom:0.5px solid #E2E2DC' : ''}">
+          <span style="background:#FCEBEB;color:#A32D2D;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;margin-top:2px">👎 싫어요</span>
+          <div style="flex:1;min-width:0">
+            <p style="font-size:13px;margin:0 0 2px;font-weight:500">Q. ${escapeHtml(item.question)}</p>
+            <p style="font-size:12px;color:#6B6B65;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">A. ${escapeHtml(item.answer)}</p>
+          </div>
+          <span style="font-size:11px;color:#9B9B95;white-space:nowrap;margin-top:2px">${escapeHtml(item.date)}</span>
+        </div>
+      `).join('');
+    }
+  } catch (_) {}
+}
+
 // ===== 초기 로드 (3차 loadAdminDashboard) =====
 loadAdminStats();
 loadAdminRegionStats();
 loadAdminTopQuestions();
 loadAdminDailyTrend();
 loadAdminDocuments();
+loadFeedbackStats();
