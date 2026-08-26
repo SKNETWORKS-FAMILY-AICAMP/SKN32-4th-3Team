@@ -1,5 +1,68 @@
 # 변경사항 공유 (2026.08.26 — soojin 브랜치)
 
+## 0. 실행 방법
+
+### 최초 설정
+
+```bash
+git clone https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN32-4th-3Team.git
+cd SKN32-4th-3Team
+git checkout soojin
+
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements-quickstart.txt
+
+copy .env.example .env
+```
+
+`.env` 파일에서 아래 값 설정:
+
+```env
+DB_ENGINE=sqlite3
+RAG_SOURCE=files
+EMBEDDING_BACKEND=hash
+LLM_BACKEND=openai
+OPENAI_API_KEY=sk-...    # 없으면 답변 대신 "[LLM 미연결]" 표시 (검색·저장은 정상 동작)
+```
+
+```bash
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py rag_reindex
+python manage.py runserver
+```
+
+`http://127.0.0.1:8000` 접속.
+
+### 이미 세팅된 경우 (pull 후)
+
+```bash
+git pull origin soojin
+python manage.py makemigrations boards
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py seed_docs
+python manage.py rag_reindex
+python manage.py seed_apartments
+python manage.py runserver
+```
+
+### 주요 URL
+
+| URL | 설명 |
+|---|---|
+| `/` | 랜딩 페이지 |
+| `/chat/` | 챗봇 |
+| `/members/mypage/` | 마이페이지 (신규) |
+| `/boards/` | 커뮤니티 게시판 |
+| `/dashboard/` | 관리자 대시보드 (staff 계정만) |
+| `/admin/` | Django 관리자 |
+
+> 상세 실행 가이드는 `RUN.md` 참고
+
+---
+
 ## 1. 마이페이지 통합 (신규)
 
 기존 **프로필**(`/members/profile/`)과 **내 단지**(`/apartments/mine/`) 페이지를 하나의 **마이페이지**(`/members/mypage/`)로 통합했습니다.

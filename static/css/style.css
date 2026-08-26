@@ -182,6 +182,26 @@ body {
 .form-group input:focus {
   border-color: var(--color-primary);
 }
+.form-group select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  outline: none;
+  background: #fff;
+  transition: border-color var(--transition);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+.form-group select:focus {
+  border-color: var(--color-primary);
+}
 .form-row-2col {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1764,7 +1784,12 @@ body {
 .board-filter input[type="text"] { flex: 1; padding: 10px 14px; border: 1px solid var(--color-border);
   border-radius: var(--radius); font-size: 14px; outline: none; }
 .board-filter input[type="text"]:focus { border-color: var(--color-primary); }
-.board-filter .region-dropdown { min-width: 160px; }
+.board-filter .region-dropdown { min-width: 160px; padding: 10px 36px 10px 14px;
+  border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 14px;
+  outline: none; background: #fff; -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; }
+.board-filter .region-dropdown:focus { border-color: var(--color-primary); }
 
 /* ── 게시글 상세 ── */
 .board-wrap .board-meta { color: #888; font-size: 13.5px; margin: -6px 0 16px; }
@@ -2010,3 +2035,40 @@ body {
 
 /* (기존 response-law-notice, response-suggestions, response-apartment-sources 는
    chat.js 리디자인에서 chat-law-text, chat-suggest, chat-source-row 로 대체됨) */
+
+/* ═══ 회원가입 리디자인 ═══ */
+.signup-card { max-width: 580px; }
+.su-section { margin-bottom: 22px; }
+.su-section-title {
+  font-size: 14px; font-weight: 700; color: #111827;
+  margin-bottom: 14px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.su-hint {
+  font-size: 12px; color: var(--color-text-muted);
+  margin-top: 4px;
+}
+/* 토글 라디오 */
+.su-radio-toggle {
+  display: flex; gap: 8px;
+}
+.su-radio-opt {
+  flex: 1; text-align: center;
+  padding: 8px 0; border-radius: 6px;
+  border: 1px solid var(--color-border);
+  font-size: 13px; font-weight: 500; color: #374151;
+  cursor: pointer; transition: var(--transition);
+}
+.su-radio-opt input { display: none; }
+.su-radio-opt:hover { border-color: var(--color-primary); }
+.su-radio-opt.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+.form-errors-top {
+  background: #FEF2F2; border: 1px solid #FECACA;
+  color: #991B1B; border-radius: 6px;
+  padding: 10px 14px; margin-bottom: 16px; font-size: 13px;
+}
