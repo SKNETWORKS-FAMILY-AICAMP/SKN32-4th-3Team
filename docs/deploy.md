@@ -442,7 +442,92 @@ tar czf ~/backup/media-$(date +%F).tar.gz media/
 
 ---
 
-## 11. 트러블슈팅
+## 11. 배포 후 보안·운영
+
+배포가 끝난 뒤에 붙이는 것들입니다. 순서는 상관없습니다.
+
+### 11-1. MySQL 을 로컬로 제한  — `관리 계정` 세션
+
+```bash
+sudo bash $PROJECT_DIR/deploy/install-system.sh mysql-secure
+```
+
+Ubuntu 기본 설정은 `/etc/mysql/mysql.conf.d/mysqld.cnf` 의 `bind-address` 가
+**주석 처리돼 있어** MySQL 이 모든 인터페이스(`*:3306`)로 열립니다. 공유기가
+3306 을 포워딩하지 않으면 인터넷에서는 안 닿지만, **LAN 의 다른 기기에서는
+접속할 수 있습니다.**
+
+스크립트는 이렇게 진행합니다:
+
+1. 설정 백업 → `bind-address = 127.0.0.1` 적용
+2. **로컬이 아닌 연결이 있는지 확인** — 있으면 잠그는 순간 끊기므로 중단
+3. `systemctl restart mysql`
+4. 실제로 `127.0.0.1:3306` 으로만 열렸는지 확인
+
+`ecobot` 은 재시작하지 않아도 됩니다. Django 의 `CONN_MAX_AGE` 기본값이 0
+이라 요청마다 연결을 새로 맺기 때문입니다.
+
+> `mysqlx-bind-address` 는 이미 `127.0.0.1` 로 설정돼 있어 33060 포트는
+> 처음부터 로컬 전용이었습니다.
+
+### 11-2. Cloudflare DDNS  — 공인 IP 변경 추적
+
+**이 서버는 가정 회선이라 공인 IP 가 고정이 아닙니다.** IP 가 바뀌면 A 레코드가
+옛 주소를 가리킨 채 남고, **`ecobotapt.com` 과 `기존-사이트.example.com` 이 함께
+죽습니다.** 도메인이 둘로 늘면서 영향 범위도 늘었습니다.
+
+**① 토큰 만들기** (사람이 해야 합니다)
+
+Cloudflare 대시보드 → 프로필 → **API Tokens** → Create Token
+→ **Edit zone DNS** 템플릿
+
+| 항목 | 값 |
+|---|---|
+| Permissions | Zone / DNS / **Edit** |
+| Zone Resources | Include / Specific zone / `ecobotapt.com` |
+| Zone Resources (추가) | Include / Specific zone / `example.com` |
+
+**두 zone 을 모두 넣어야 위키까지 따라갑니다.** 하나만 넣으면 그 도메인만
+갱신되고 나머지는 조용히 실패합니다.
+
+**② 설치** — `관리 계정` 세션
+
+```bash
+sudo bash $PROJECT_DIR/deploy/install-system.sh ddns
+sudo nano /etc/ddns-cloudflare/config.env       # CF_API_TOKEN= 에 토큰 붙여넣기
+sudo $PROJECT_DIR/deploy/ddns-cloudflare.sh   # 수동으로 한 번
+sudo systemctl enable --now ddns-cloudflare.timer
+```
+
+토큰을 먼저 넣고 `ddns` 를 실행하면 스크립트가 수동 실행·타이머 활성화까지
+알아서 합니다. **타이머를 켜기 전에 반드시 한 번 직접 돌려 보십시오** —
+토큰 권한이 모자라면 여기서 드러납니다. 타이머로만 돌리면 5 분 뒤 저널을
+봐야 압니다.
+
+**동작**
+
+- 5 분 주기 + 부팅 1 분 뒤 (`ddns-cloudflare.timer`)
+- 공인 IP 를 3 곳에서 순서대로 조회하고 **형식 검증을 통과한 값만** 씁니다.
+  조회처가 죽었을 때 빈 값으로 레코드를 덮어쓰면 도메인이 통째로 날아갑니다.
+- 현재 값과 같으면 API 를 호출하지 않습니다.
+- 갱신할 때 **`proxied` 와 `ttl` 을 원래 값 그대로** 실어 보냅니다. 빠뜨리면
+  Cloudflare 가 기본값으로 되돌려서, 회색 구름이던 레코드가 주황 구름이 되고
+  **Caddy 의 인증서 갱신이 막힙니다.**
+- 시작할 때 토큰을 먼저 검증합니다. 안 하면 토큰이 틀렸을 때 모든 조회가 빈
+  결과로 돌아와 "zone 을 찾지 못했습니다"로 보이고, 원인에서 먼 곳(Cloudflare
+  zone 설정)을 뒤지게 됩니다.
+
+```bash
+journalctl -u ddns-cloudflare -f          # 로그
+systemctl list-timers ddns-cloudflare     # 다음 실행 시각
+```
+
+**남는 한계:** IP 가 바뀐 뒤 최대 5 분 + DNS TTL(자동 = 300 초)만큼은 옛 주소를
+가리킵니다. 주기를 줄여도 TTL 이 하한이라 실익이 적습니다.
+
+---
+
+## 12. 트러블슈팅
 
 | 증상 | 원인 | 조치 |
 |---|---|---|
@@ -456,6 +541,9 @@ tar czf ~/backup/media-$(date +%F).tar.gz media/
 | `pip install mysqlclient` 컴파일 에러 | `default-libmysqlclient-dev` 없음 | 1단계 apt |
 | `ModuleNotFoundError: sentence_transformers` | `.env`가 `EMBEDDING_BACKEND=local` | `openai`로 되돌리거나 패키지 설치 |
 | 리다이렉트 무한루프 | `DJANGO_SSL_REDIRECT=True` + 프록시 헤더 불일치 | `False`로 (Caddy가 이미 처리) |
+| DDNS 가 조용히 안 돎 | 토큰 Zone Resources 에 그 도메인 누락 | `journalctl -u ddns-cloudflare` 확인 |
+| 인증서 갱신이 갑자기 실패 | DDNS 가 `proxied` 를 되돌려 주황 구름이 됨 | Cloudflare 에서 회색 구름으로 |
+| MySQL 접속 거부(다른 기기) | `mysql-secure` 로 로컬 제한됨 | 의도된 동작 |
 
 ### 롤백  — `관리 계정` 세션
 

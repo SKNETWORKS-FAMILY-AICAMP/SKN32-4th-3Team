@@ -213,7 +213,8 @@ Caddy (443) ──▶ gunicorn (127.0.0.1:8000) ──▶ Django ──▶ MySQL
 | `deploy/gunicorn.conf.py` | WSGI 서버 설정 |
 | `deploy/ecobot.service` | systemd 유닛 |
 | `deploy/Caddyfile.ecobotapt` | Caddy 사이트 블록 |
-| `deploy/install-system.sh` | root 권한이 필요한 작업 (apt·MySQL·systemd·Caddy) |
+| `deploy/install-system.sh` | root 권한이 필요한 작업 (apt·MySQL·systemd·Caddy·DDNS) |
+| `deploy/ddns-cloudflare.*` | 공인 IP 변경 시 A 레코드 자동 갱신 |
 | `docs/decisions/0001-*.md` | 구성 결정 배경과 대가 |
 
 배포 전 반드시 확인할 것:

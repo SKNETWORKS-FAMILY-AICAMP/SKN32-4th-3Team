@@ -1,0 +1,29 @@
+# Cloudflare DDNS — 공인 IP 변경 시 A 레코드 갱신 (oneshot, timer 가 호출)
+#
+#   sudo bash deploy/install-system.sh ddns   로 설치됩니다.
+#   로그:  journalctl -u ddns-cloudflare
+
+[Unit]
+Description=Cloudflare DDNS 갱신
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# 설정 파일(/etc/ddns-cloudflare/config.env, 0600 root)에 API 토큰이 있어
+# root 로 돕니다. 하는 일이 HTTPS 호출뿐이라 아래로 강하게 가둡니다.
+ExecStart=@PROJECT_DIR@/deploy/ddns-cloudflare.sh
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# 쓰기 권한이 필요한 곳이 없습니다(로그는 stdout → journald).

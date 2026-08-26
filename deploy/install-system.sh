@@ -45,6 +45,10 @@ usage() {
   caddy    Caddy 사이트 블록 추가        ← 마지막
   all      위 넷을 연달아
 
+  ── 배포 후 보안·운영 (선택, 순서 무관) ──
+  mysql-secure  MySQL 을 127.0.0.1 로 제한
+  ddns          Cloudflare DDNS 설치 (IP 변경 추적)
+
 런북: $PROJECT_DIR/docs/deploy.md
 USAGE
 }
@@ -52,7 +56,7 @@ USAGE
 # 사용법을 root 검사보다 먼저 봅니다 — 인자를 몰라서 실행해 본 사람에게
 # "root 로 실행하십시오"만 띄우면 무엇을 하라는 건지 알 수 없습니다.
 case "${1:-}" in
-    deps|db|service|caddy|all) ;;
+    deps|db|service|caddy|all|mysql-secure|ddns) ;;
     *) usage; exit 1 ;;
 esac
 
@@ -217,12 +221,119 @@ MSG
 }
 
 
+secure_mysql() {
+    say "MySQL 을 127.0.0.1 로 제한"
+    local cnf="/etc/mysql/mysql.conf.d/mysqld.cnf"
+    [[ -f $cnf ]] || die "$cnf 가 없습니다"
+
+    if grep -qE "^bind-address[[:space:]]*=" "$cnf"; then
+        ok "bind-address 가 이미 명시돼 있습니다: $(grep -E '^bind-address' "$cnf")"
+    else
+        # 기본 설정은 이 줄이 주석 처리돼 있어 MySQL 이 모든 인터페이스(*:3306)
+        # 로 열립니다. 공유기가 3306 을 포워딩하지 않으면 인터넷에서는 안 닿지만
+        # LAN 의 다른 기기에서는 접속할 수 있습니다.
+        cp -a "$cnf" "${cnf}.bak.$(date +%Y%m%d-%H%M%S)"
+        if grep -qE "^#bind-address[[:space:]]*=" "$cnf"; then
+            sed -i "s/^#bind-address[[:space:]]*=.*/bind-address = 127.0.0.1/" "$cnf"
+        else
+            sed -i "/^\[mysqld\]/a bind-address = 127.0.0.1" "$cnf"
+        fi
+        ok "bind-address = 127.0.0.1 설정됨 (백업 남김)"
+    fi
+
+    # 재시작 전에 LAN 에서 붙어 있는 클라이언트가 있는지 봅니다. 있으면
+    # 잠그는 순간 그쪽이 끊깁니다.
+    local remote
+    remote=$(mysql -N -B -e "SELECT COUNT(*) FROM information_schema.processlist WHERE host NOT LIKE 'localhost%' AND host NOT LIKE '127.0.0.1%';" 2>/dev/null || echo 0)
+    if [[ ${remote:-0} -gt 0 ]]; then
+        warn "로컬이 아닌 연결이 $remote 건 있습니다. 잠그면 끊깁니다."
+        warn "확인:  sudo mysql -e \"SELECT user,host FROM information_schema.processlist\""
+        die "중단했습니다. 확인 후 다시 실행하십시오"
+    fi
+    ok "로컬 외 연결 없음 — 재시작해도 안전합니다"
+
+    systemctl restart mysql
+    sleep 3
+    if ss -tln | grep -qE "127\.0\.0\.1:3306"; then
+        ok "MySQL 이 127.0.0.1:3306 으로만 열렸습니다"
+    else
+        warn "현재 바인딩: $(ss -tln | grep 3306 || echo '(3306 없음)')"
+        die "예상과 다릅니다. $cnf 를 확인하십시오"
+    fi
+
+    # Django 는 CONN_MAX_AGE 기본값(0)이라 요청마다 연결을 새로 맺습니다.
+    # 재시작 직후 요청도 새 연결을 만들므로 ecobot 을 건드릴 필요가 없습니다.
+    systemctl is-active --quiet ecobot && ok "ecobot 은 재시작 불필요 (CONN_MAX_AGE=0)"
+}
+
+
+install_ddns() {
+    say "Cloudflare DDNS"
+    local dir="/etc/ddns-cloudflare" cfg="/etc/ddns-cloudflare/config.env"
+    local src="$PROJECT_DIR/deploy"
+
+    install -d -m 700 -o root -g root "$dir"
+
+    if [[ -f $cfg ]]; then
+        ok "설정이 이미 있습니다: $cfg (덮어쓰지 않습니다)"
+    else
+        cat > "$cfg" <<'CFG'
+# Cloudflare DDNS 설정.  이 파일에 API 토큰이 들어갑니다 — 0600 유지.
+#
+# 토큰 만들기:
+#   Cloudflare 대시보드 → 우측 상단 프로필 → API Tokens → Create Token
+#   → "Edit zone DNS" 템플릿
+#   → Permissions : Zone / DNS / Edit
+#   → Zone Resources: Include / Specific zone → ecobotapt.com
+#                     (+ Add more) Include / Specific zone → example.com
+#   → 두 zone 을 모두 넣어야 위키까지 따라갑니다.
+
+CF_API_TOKEN=
+
+# 공백으로 구분. 여기 적힌 A 레코드만 갱신합니다(이미 존재해야 합니다).
+DDNS_RECORDS="ecobotapt.com www.ecobotapt.com 기존-사이트.example.com"
+CFG
+        chmod 600 "$cfg"
+        ok "설정 템플릿 생성: $cfg"
+    fi
+
+    install -m 644 -o root -g root "$src/ddns-cloudflare.service" /etc/systemd/system/
+    install -m 644 -o root -g root "$src/ddns-cloudflare.timer"   /etc/systemd/system/
+    systemctl daemon-reload
+    ok "유닛 설치됨"
+
+    if ! grep -qE "^CF_API_TOKEN=.+" "$cfg"; then
+        warn "CF_API_TOKEN 이 비어 있어 타이머를 켜지 않았습니다."
+        cat <<MSG
+
+  토큰을 넣은 뒤 아래를 실행하십시오:
+      sudo nano $cfg
+      sudo $PROJECT_DIR/deploy/ddns-cloudflare.sh      # 한 번 수동 확인
+      sudo systemctl enable --now ddns-cloudflare.timer
+MSG
+        return 0
+    fi
+
+    # 타이머를 켜기 전에 한 번 직접 돌려 봅니다 — 토큰 권한이 모자라면
+    # 여기서 드러납니다. 타이머로만 돌리면 5분 뒤 저널을 봐야 압니다.
+    if "$src/ddns-cloudflare.sh"; then
+        systemctl enable --now ddns-cloudflare.timer
+        ok "타이머 활성화됨 (5분 주기)"
+        systemctl list-timers ddns-cloudflare.timer --no-pager | sed -n "2p"
+    else
+        die "수동 실행이 실패했습니다. 위 오류를 확인하십시오 (타이머는 켜지 않았습니다)"
+    fi
+}
+
+
 case "$1" in
     deps)    install_deps ;;
     db)      install_db ;;
     service) install_service ;;
     caddy)   install_caddy ;;
     all)     install_deps; install_db; install_service; install_caddy ;;
+    mysql-secure) secure_mysql ;;
+    ddns)         install_ddns ;;
 esac
 
 say "완료"
