@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}마이페이지 - Ecobot{% endblock %}
+{% block content %}
+<div class="mp-layout">
+  <div class="mp-container">
+
+    <!-- 헤더 -->
+    <div class="mp-header">
+      <a class="mp-back" href="{% url 'chat:room' %}" title="챗봇으로">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </a>
+      <h1 class="mp-title">마이페이지</h1>
+    </div>
+
+    <!-- 프로필 상단 -->
+    <div class="mp-profile-top">
+      <div class="mp-avatar">{{ user.nickname|default:user.display_name|first|upper }}</div>
+      <div class="mp-profile-info">
+        <div class="mp-name">{{ user.nickname|default:user.display_name }}</div>
+        <div class="mp-email">{{ user.email }}</div>
+      </div>
+    </div>
+
+    <!-- 탭 -->
+    <div class="mp-tabs" id="mp-tabs">
+      <button class="mp-tab active" data-tab="info">내 정보</button>
+      <button class="mp-tab" data-tab="apt">내 단지</button>
+      <button class="mp-tab" data-tab="activity">활동 내역</button>
+      <button class="mp-tab" data-tab="settings">설정</button>
+    </div>
+
+    <!-- ═══ 내 정보 탭 ═══ -->
+    <div class="mp-panel active" id="panel-info">
+      <div class="mp-info-rows">
+        <div class="mp-info-row">
+          <span class="mp-info-label">아이디</span>
+          <span class="mp-info-value">{{ user.username }}</span>
+        </div>
+        <div class="mp-info-row">
+          <span class="mp-info-label">이름</span>
+          <span class="mp-info-value">{{ user.display_name }}</span>
+        </div>
+        <div class="mp-info-row">
+          <span class="mp-info-label">닉네임</span>
+          <span class="mp-info-value">{{ user.nickname|default:"-" }}</span>
+        </div>
+        <div class="mp-info-row">
+          <span class="mp-info-label">이메일</span>
+          <span class="mp-info-value">{{ user.email }}</span>
+        </div>
+        <div class="mp-info-row">
+          <span class="mp-info-label">거주 지역</span>
+          <span class="mp-info-value">{{ user.get_region_display }}</span>
+        </div>
+        <div class="mp-info-row">
+          <span class="mp-info-label">전화번호</span>
+          <span class="mp-info-value">{{ user.phone|default:"-" }}</span>
+        </div>
+        <div class="mp-info-row">
+          <span class="mp-info-label">가입일</span>
+          <span class="mp-info-value">{{ user.date_joined|date:"Y.m.d" }}</span>
+        </div>
+      </div>
+      <a class="btn btn-primary btn-full" href="{% url 'members:profile_edit' %}">프로필 수정</a>
+    </div>
+
+    <!-- ═══ 내 단지 탭 ═══ -->
+    <div class="mp-panel" id="panel-apt">
+      {% if active_membership %}
+      <div class="mp-apt-current">
+        <div class="mp-apt-label">현재 단지</div>
+        <div class="mp-apt-name">{{ active_membership.apartment }}</div>
+        <span class="mp-apt-role-badge">{{ active_membership.get_role_display }}</span>
+      </div>
+      {% endif %}
+
+      <div class="mp-apt-list-title">소속 단지 목록</div>
+      {% for m in memberships %}
+      <div class="mp-apt-card">
+        <div class="mp-apt-card-top">
+          <div>
+            <div class="mp-apt-card-name">{{ m.apartment }}</div>
+            <div class="mp-apt-card-meta">{{ m.get_role_display }} · {{ m.get_status_display }} · {{ m.applied_at|date:"Y.m.d" }} 신청</div>
+          </div>
+          <div class="mp-apt-card-actions">
+            {% if m.status == "approved" and m != active_membership %}
+            <form method="post" action="{% url 'apartments:switch' m.apartment_id %}" style="display:inline">
+              {% csrf_token %}<button class="mp-btn-sm" type="submit">전환</button>
+            </form>
+            {% endif %}
+            {% if m.status == "approved" %}
+            <form method="post" action="{% url 'apartments:membership_leave' m.pk %}" style="display:inline"
+                  onsubmit="return confirm('정말 이 단지 소속을 해지할까요?');">
+              {% csrf_token %}<button class="mp-btn-sm mp-btn-danger" type="submit">나가기</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="mp-empty">소속된 단지가 없습니다.</div>
+      {% endfor %}
+
+      <div class="mp-apt-actions-bottom">
+        <a class="btn btn-outline btn-full" href="{% url 'apartments:search' %}">단지 검색 / 신청</a>
+      </div>
+
+      {% if active_membership %}
+      <div class="mp-apt-shortcuts">
+        <div class="mp-apt-list-title" style="margin-top:16px">바로가기</div>
+        <div class="mp-shortcut-row">
+          <a class="mp-btn-sm" href="{% url 'apartments:rule_list' %}">단지 규정</a>
+          {% if user.is_service_admin %}
+          <a class="mp-btn-sm" href="{% url 'apartments:membership_queue' %}">관리자 승인 큐</a>
+          <a class="mp-btn-sm" href="{% url 'apartments:manager_roster' %}">관리자 명단</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if user.is_service_admin %}
+      <div class="mp-note mp-note-warning">
+        <strong>최종관리자</strong> — 모든 단지의 관리자/입주민 승인, 단지 규정 관리 등 전체 서비스를 관리할 수 있습니다.
+      </div>
+      {% elif is_manager %}
+      <div class="mp-note mp-note-info">
+        <strong>관리자</strong> — 커뮤니티 게시글 비공개 처리, 댓글 삭제 등 단지 관리 기능을 사용할 수 있습니다.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ═══ 활동 내역 탭 ═══ -->
+    <div class="mp-panel" id="panel-activity">
+      <div class="mp-stats">
+        <div class="mp-stat">
+          <div class="mp-stat-num">{{ board_count }}</div>
+          <div class="mp-stat-label">작성 글</div>
+        </div>
+        <div class="mp-stat">
+          <div class="mp-stat-num">{{ comment_count }}</div>
+          <div class="mp-stat-label">댓글</div>
+        </div>
+        <div class="mp-stat">
+          <div class="mp-stat-num">{{ like_count }}</div>
+          <div class="mp-stat-label">좋아요</div>
+        </div>
+      </div>
+
+      <div class="mp-act-pills" id="act-pills">
+        <button class="mp-act-pill active" data-sub="my-posts">내 글</button>
+        <button class="mp-act-pill" data-sub="my-comments">내 댓글</button>
+        <button class="mp-act-pill" data-sub="my-likes">좋아요</button>
+      </div>
+
+      <div class="mp-act-sub active" id="sub-my-posts">
+        {% for b in recent_boards %}
+        <a class="mp-act-item" href="{% url 'boards:detail' b.pk %}">
+          <div class="mp-act-icon">📝</div>
+          <div class="mp-act-body">
+            <div class="mp-act-title">{{ b.title }}</div>
+            <div class="mp-act-date">{{ b.created_at|date:"Y.m.d" }} · 조회 {{ b.read_count }} · 댓글 {{ b.comment_count }}</div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="mp-empty">작성한 글이 없습니다.</div>
+        {% endfor %}
+      </div>
+
+      <div class="mp-act-sub" id="sub-my-comments">
+        {% for c in recent_comments %}
+        <a class="mp-act-item" href="{% url 'boards:detail' c.board.pk %}">
+          <div class="mp-act-icon">💬</div>
+          <div class="mp-act-body">
+            <div class="mp-act-title">{{ c.content|truncatechars:40 }}</div>
+            <div class="mp-act-date">{{ c.created_at|date:"Y.m.d" }} · 원글: {{ c.board.title|truncatechars:20 }}</div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="mp-empty">작성한 댓글이 없습니다.</div>
+        {% endfor %}
+      </div>
+
+      <div class="mp-act-sub" id="sub-my-likes">
+        {% for b in liked_boards %}
+        <a class="mp-act-item" href="{% url 'boards:detail' b.pk %}">
+          <div class="mp-act-icon">❤️</div>
+          <div class="mp-act-body">
+            <div class="mp-act-title">{{ b.title }}</div>
+            <div class="mp-act-date">{{ b.created_at|date:"Y.m.d" }} · 조회 {{ b.read_count }}</div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="mp-empty">좋아요한 글이 없습니다.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ═══ 설정 탭 ═══ -->
+    <div class="mp-panel" id="panel-settings">
+      <div class="mp-settings-section">
+        <div class="mp-settings-title">기본 지역</div>
+        <div class="mp-settings-desc">챗봇이 기본으로 적용할 지역입니다.</div>
+        <div class="mp-settings-value">{{ user.get_region_display }}</div>
+        <a class="mp-btn-sm" href="{% url 'members:profile_edit' %}">변경</a>
+      </div>
+
+      <div class="mp-settings-divider"></div>
+
+      <div class="mp-settings-section">
+        <div class="mp-settings-title">계정</div>
+        <div class="mp-settings-links">
+          <a href="{% url 'members:profile_edit' %}" class="mp-settings-link mp-settings-link-primary">프로필 수정</a>
+          <a href="{% url 'members:withdraw' %}" class="mp-settings-link mp-text-danger">회원 탈퇴</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// 탭 전환
+document.querySelectorAll('.mp-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mp-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mp-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+// 활동 내역 서브탭
+document.querySelectorAll('.mp-act-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.mp-act-pill').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.mp-act-sub').forEach(s => s.classList.remove('active'));
+    pill.classList.add('active');
+    document.getElementById('sub-' + pill.dataset.sub).classList.add('active');
+  });
+});
+</script>
+{% endblock %}

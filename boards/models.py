@@ -71,6 +71,19 @@ class Board(models.Model):
         help_text="어느 지역 기준의 글인지. 검색 시 지역 필터에 쓰입니다.",
     )
     attachment = models.FileField("첨부파일", upload_to="board_files/%Y/%m/", blank=True, null=True)
+    is_hidden = models.BooleanField(
+        "비공개",
+        default=False,
+        help_text="관리자가 비공개 처리한 글. 목록에서 일반 사용자에게 숨겨집니다.",
+    )
+    hidden_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+",
+        verbose_name="비공개 처리자",
+    )
+    hidden_at = models.DateTimeField("비공개 처리일", null=True, blank=True)
     read_count = models.PositiveIntegerField("조회수", default=0)
     like_count = models.PositiveIntegerField("좋아요 수", default=0)
     comment_count = models.PositiveIntegerField("댓글 수", default=0)

@@ -16,6 +16,7 @@
     <!-- 게시글 헤더 -->
     <div class="detail-header">
       <div class="community-card-badges">
+        {% if board.is_hidden %}<span class="badge badge-hidden">비공개</span>{% endif %}
         {% if board.category == 'question' %}<span class="badge badge-question">질문</span>
         {% elif board.category == 'info' %}<span class="badge badge-info">정보공유</span>
         {% elif board.category == 'review' %}<span class="badge badge-review">후기</span>
@@ -33,19 +34,31 @@
             {% if board.updated_at|date:"YmdHi" != board.created_at|date:"YmdHi" %} · <em>수정됨</em>{% endif %}
           </span>
         </div>
-        {% if user.is_authenticated and board.author_id == user.id %}
+        {% if can_delete or is_manager %}
         <div class="detail-more-wrap" style="position:relative;">
           <button class="detail-more-btn" onclick="document.getElementById('more-menu').classList.toggle('show')"
                   style="background:none; border:none; cursor:pointer; font-size:20px; padding:4px 8px; color:var(--color-text-secondary); border-radius:var(--radius);">
             ⋮
           </button>
           <div id="more-menu" class="detail-more-menu">
+            {% if board.author_id == user.id %}
             <a href="{% url 'boards:update' board.pk %}" class="detail-more-item">✏️ 수정</a>
+            {% endif %}
+            {% if can_delete %}
             <form method="post" action="{% url 'boards:delete' board.pk %}" style="margin:0;"
                   onsubmit="return confirm('이 글을 삭제할까요?')">
               {% csrf_token %}
               <button type="submit" class="detail-more-item detail-more-danger">🗑️ 삭제</button>
             </form>
+            {% endif %}
+            {% if is_manager %}
+            <form method="post" action="{% url 'boards:hide' board.pk %}" style="margin:0;">
+              {% csrf_token %}
+              <button type="submit" class="detail-more-item">
+                {% if board.is_hidden %}👁 공개 처리{% else %}🔒 비공개 처리{% endif %}
+              </button>
+            </form>
+            {% endif %}
           </div>
         </div>
         {% endif %}
@@ -107,7 +120,7 @@
               <span class="community-author-name">{{ comment.author.community_name }}</span>
               <span class="community-card-date">{{ comment.created_at|timesince }} 전</span>
             </div>
-            {% if user.is_authenticated and comment.author_id == user.id %}
+            {% if user.is_authenticated and comment.author_id == user.id or is_manager %}
             <form method="post" action="{% url 'boards:comment_delete' board.pk comment.pk %}"
                   onsubmit="return confirm('댓글을 삭제할까요?')" style="display:inline">
               {% csrf_token %}

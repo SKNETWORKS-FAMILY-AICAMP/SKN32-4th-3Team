@@ -1,20 +1,9 @@
-// 3차 static/app.js 의 chat 부분 이식본.
-//
-// 바뀐 것:
-//   - fetch 경로: /api/chat 계열 → chat-config JSON 의 Django URL
-//   - POST 에 X-CSRFToken 헤더 (Django CSRF. credentials 는 same-origin 기본)
-//   - session id: Date.now() 문자열 → 서버 pk. "새 대화"는 serverId=null 인
-//     로컬 세션으로 시작하고, 첫 질문의 응답이 준 pk 를 붙인다
-//   - 대화 삭제가 서버에도 반영 (3차는 화면에서만 지워져 새로고침 시 부활)
-//   - escapeHtml(): 3차는 사용자 입력·답변을 innerHTML 에 그대로 넣어
-//     XSS 가 가능했다. 렌더링 직전에 이스케이프한다
-// 유지한 것: 세션 복원·전환, 말풍선/팁/출처 렌더링, 타이핑 표시,
-//   인기 질문으로 빠른 질문 갱신, 사이드바 리사이즈 — 3차 로직 그대로.
+// 4차 챗봇 JS — 3차 app.js 이식 + UI 리디자인.
 
 const CONFIG = JSON.parse(document.getElementById('chat-config').textContent);
 
 let chatSessions = [];
-let currentLocalId = null;   // 화면 전환용 로컬 id (서버 pk 와 별개)
+let currentLocalId = null;
 let isTyping = false;
 let localSeq = 0;
 
@@ -53,7 +42,7 @@ function currentSession() {
   return chatSessions.find(s => s.localId === currentLocalId);
 }
 
-// ===== 세션 복원 (3차 restoreAllSessions) =====
+// ===== 세션 복원 =====
 async function restoreAllSessions() {
   try {
     const res = await fetch(CONFIG.urls.sessions);
@@ -72,8 +61,6 @@ async function restoreAllSessions() {
         serverId: g.session_id,
         title,
         region: g.region,
-        // 4차 2R 추가분: 이 대화방이 생성 시점에 고정한 단지. 프로필에서
-        // 단지를 바꿔도 이 대화방은 옛 기준으로 남는다.
         apartment: g.apartment || null,
         messages: g.messages.map(m => ({
           role: m.role === 'user' ? 'user' : 'bot',
@@ -89,33 +76,33 @@ async function restoreAllSessions() {
     currentLocalId = chatSessions[0].localId;
     document.getElementById('region-select').value = chatSessions[0].region;
 
-    renderChatList(); renderMessages(); updateRegionBadge(); updateChatTitle();
+    renderChatList(); renderMessages(); updateChatTitle();
   } catch (err) {
     console.error('대화 기록 복원 실패:', err);
     createNewSession();
   }
 }
 
-// ===== 세션 관리 (3차 createNewSession / switchSession / deleteSession) =====
+// ===== 세션 관리 =====
 function createNewSession() {
   const region = document.getElementById('region-select').value;
   const session = {
     localId: 'new-' + (++localSeq),
-    serverId: null,          // 첫 질문에서 서버가 pk 를 발급
+    serverId: null,
     title: '새 대화',
     region,
     messages: [],
   };
   chatSessions.unshift(session);
   currentLocalId = session.localId;
-  renderChatList(); renderMessages(); updateRegionBadge(); updateChatTitle();
+  renderChatList(); renderMessages(); updateChatTitle();
 }
 
 function switchSession(localId) {
   currentLocalId = localId;
   const session = currentSession();
   if (session) document.getElementById('region-select').value = session.region;
-  renderChatList(); renderMessages(); updateRegionBadge(); updateChatTitle();
+  renderChatList(); renderMessages(); updateChatTitle();
 }
 
 async function deleteSession(localId, e) {
@@ -132,31 +119,20 @@ async function deleteSession(localId, e) {
     currentLocalId = chatSessions[0].localId;
     document.getElementById('region-select').value = chatSessions[0].region;
   }
-  renderChatList(); renderMessages(); updateRegionBadge(); updateChatTitle();
+  renderChatList(); renderMessages(); updateChatTitle();
 }
 
 function renderChatList() {
   const list = document.getElementById('chat-list');
+  // 날짜별 그룹핑은 서버에서 created_at 을 안 보내므로 단순 목록 유지
   list.innerHTML = chatSessions.map(s => `
     <div class="chat-item ${s.localId === currentLocalId ? 'active' : ''}"
          onclick="switchSession('${s.localId}')">
       <span class="chat-item-icon">💬</span>
-      <span>${escapeHtml(s.title)}</span>
+      <span class="chat-item-text">${escapeHtml(s.title)}</span>
       <button class="chat-item-delete" onclick="deleteSession('${s.localId}', event)" title="삭제">✕</button>
     </div>
   `).join('');
-}
-
-// ===== 지역 =====
-document.getElementById('region-select').addEventListener('change', function () {
-  updateRegionBadge();
-  const session = currentSession();
-  if (session) session.region = this.value;
-});
-
-function updateRegionBadge() {
-  const sel = document.getElementById('region-select');
-  document.getElementById('region-badge').textContent = sel.options[sel.selectedIndex].text;
 }
 
 function updateChatTitle() {
@@ -164,19 +140,27 @@ function updateChatTitle() {
   document.getElementById('chat-title').textContent = session ? session.title : '새 대화';
 }
 
-// ===== 메시지 렌더링 (3차 renderMessages — 말풍선 구조 그대로) =====
+// ===== 지역 (숨김 셀렉트, 세션에서 관리) =====
+document.getElementById('region-select').addEventListener('change', function () {
+  const session = currentSession();
+  if (session) session.region = this.value;
+});
+
+// ===== 메시지 렌더링 (리디자인) =====
+const QUICK_ICONS = ['♻️', '🧴', '🍎', '🗑️'];
+
 function renderMessages() {
   const container = document.getElementById('chat-messages');
   const session = currentSession();
 
   if (!session || session.messages.length === 0) {
     container.innerHTML = `
-      <div class="welcome-message" id="welcome-message">
-        <div class="welcome-icon">🌿</div>
-        <h3>Ecobot에 오신 것을 환영합니다</h3>
-        <p>환경 실천에 관한 질문을 해보세요!</p>
-        <div class="quick-questions">
-          ${quickQuestions.map(q => `<button class="quick-q" onclick="sendQuickQuestion(this.textContent)">${escapeHtml(q)}</button>`).join('')}
+      <div class="welcome-message">
+        <div class="welcome-icon-wrap"><span class="welcome-leaf">🌿</span></div>
+        <h3>무엇이든 물어보세요</h3>
+        <p>분리배출, 음식물쓰레기, 대형폐기물 등<br>환경 실천에 관한 궁금증을 해결해 드려요</p>
+        <div class="quick-grid">
+          ${quickQuestions.map((q, i) => `<button class="quick-card" onclick="sendQuickQuestion(this.dataset.q)" data-q="${escapeHtml(q)}"><span class="quick-card-icon">${QUICK_ICONS[i] || '💬'}</span>${escapeHtml(q)}</button>`).join('')}
         </div>
       </div>`;
     return;
@@ -186,52 +170,60 @@ function renderMessages() {
     if (msg.role === 'user') {
       return `
         <div class="message user">
-          <div class="message-avatar">${escapeHtml(CONFIG.userName[0] || 'U').toUpperCase()}</div>
+          <div class="message-avatar user-avatar-msg">${escapeHtml(CONFIG.userName[0] || 'U').toUpperCase()}</div>
           <div class="message-content">${escapeHtml(msg.content)}</div>
         </div>`;
     }
+
+    // ── 실천 팁 ──
     const tipHtml = msg.tip
-      ? `<div class="response-tip"><div class="tip-label"><span class="tip-icon">💡</span> 실천 팁</div><p>${escapeHtml(msg.tip)}</p></div>`
+      ? `<div class="chat-tip-card">
+           <div class="chat-tip-label">💡 실천 팁</div>
+           <p class="chat-tip-text">${escapeHtml(msg.tip)}</p>
+         </div>`
       : '';
-    const sourceLabel = msg.source || (msg.sources && msg.sources.length
-      ? msg.sources.map(s => s.title).join(', ')
-      : '');
-    const sourcesHtml = sourceLabel ? `<div class="response-source">출처: ${escapeHtml(sourceLabel)}</div>` : '';
-    // 4차 2R 추가분: 단지 규정 출처는 등급·확인수·등록시점을 함께 보여준다.
-    // 관리사무소 규약(official)과 이웃 제보(resident)가 같은 형태로
-    // 나오면 신뢰도를 구분할 수 없다는 설계 문서 7절의 지적을 반영한다.
-    const apartmentSources = (msg.sources || []).filter(s => s.source_level);
-    const apartmentSourcesHtml = apartmentSources.length
-      ? `<div class="response-apartment-sources">${apartmentSources.map(s => {
-          const levelLabel = s.source_level === 'official' ? '관리사무소·규약' : '입주민 제보';
-          const dateLabel = s.registered_at ? ` · ${escapeHtml(s.registered_at)} 등록` : '';
-          return `<span class="apartment-source-badge">🏢 ${escapeHtml(s.title)} — ${levelLabel}${dateLabel}</span>`;
-        }).join('')}</div>`
+
+    // ── 출처 (muted 텍스트 + 가운뎃점) ──
+    const allSources = [];
+    if (msg.source) {
+      msg.source.split(',').forEach(s => { if (s.trim()) allSources.push(s.trim()); });
+    } else if (msg.sources && msg.sources.length) {
+      msg.sources.forEach(s => { if (s.title) allSources.push(s.title); });
+    }
+    // 단지 규정 출처도 합침
+    const aptSources = (msg.sources || []).filter(s => s.source_level);
+    aptSources.forEach(s => {
+      const label = s.source_level === 'official' ? '관리사무소' : '입주민 제보';
+      allSources.push(s.title + ' (' + label + ')');
+    });
+    const uniqueSources = [...new Set(allSources)];
+    const sourcesHtml = uniqueSources.length
+      ? `<div class="chat-source-row">출처 ${uniqueSources.map(s => `<span class="chat-source-item">${escapeHtml(s)}</span>`).join('<span class="chat-source-sep">·</span>')}</div>`
       : '';
-    // 4차 추가분: 법령 시행 안내 · 유사 질문 추천
-    const lawNoticeHtml = msg.law_notice
-      ? `<div class="response-law-notice">${escapeHtml(msg.law_notice)}</div>`
+
+    // ── 법령 (muted 한 줄) ──
+    const lawHtml = msg.law_notice
+      ? `<div class="chat-law-text">${escapeHtml(msg.law_notice)}</div>`
       : '';
+
+    // ── 추천 질문 ──
     const suggestHtml = (msg.suggested_questions && msg.suggested_questions.length)
-      ? `<div class="response-suggestions">
-           <div class="tip-label"><span class="tip-icon">🔎</span> 이런 질문은 어떠세요?</div>
-           <div class="quick-questions">${msg.suggested_questions.map(q =>
-             `<button class="quick-q" onclick="sendQuickQuestion(this.textContent)">${escapeHtml(q.question)}</button>`
+      ? `<div class="chat-suggest">
+           <div class="chat-suggest-label">이런 질문은 어떠세요?</div>
+           <div class="chat-suggest-btns">${msg.suggested_questions.map(q =>
+             `<button class="chat-suggest-btn" onclick="sendQuickQuestion(this.textContent)">${escapeHtml(q.question || q)}</button>`
            ).join('')}</div>
          </div>`
       : '';
+
     return `
       <div class="message bot">
-        <div class="message-avatar">🌿</div>
+        <div class="message-avatar bot-avatar-msg">🌿</div>
         <div class="message-content">
-          <div class="response-answer">
-            <div class="answer-label"><span class="answer-icon">📋</span> 답변</div>
-            <p>${escapeHtml(msg.content)}</p>
-          </div>
+          <p class="chat-answer-text">${escapeHtml(msg.content)}</p>
           ${tipHtml}
           ${sourcesHtml}
-            ${apartmentSourcesHtml}
-          ${lawNoticeHtml}
+          ${lawHtml}
           ${suggestHtml}
         </div>
       </div>`;
@@ -240,7 +232,7 @@ function renderMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-// ===== 전송 (3차 sendMessage / addUserMessage / askBackend) =====
+// ===== 전송 =====
 function sendMessage() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
@@ -275,7 +267,7 @@ async function askBackend(question) {
   typingDiv.className = 'message bot';
   typingDiv.id = 'typing-indicator';
   typingDiv.innerHTML = `
-    <div class="message-avatar">🌿</div>
+    <div class="message-avatar bot-avatar-msg">🌿</div>
     <div class="message-content">
       <div class="typing-indicator">
         <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
@@ -292,10 +284,10 @@ async function askBackend(question) {
       session_id: session && session.serverId ? session.serverId : null,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();  // {session_id, answer, tip, source, sources, suggested_questions, law_notice}
+    const data = await res.json();
 
     if (session) {
-      session.serverId = data.session_id;          // 새 대화면 서버 pk 를 붙인다
+      session.serverId = data.session_id;
       session.messages.push({
         role: 'bot',
         content: data.answer,
@@ -321,10 +313,10 @@ async function askBackend(question) {
   if (typing) typing.remove();
   isTyping = false;
   renderMessages();
-  loadPopularQuestions(true);   // 질문 후 인기 질문 갱신 (3차 동일)
+  loadPopularQuestions(true);
 }
 
-// ===== 인기 질문 → 빠른 질문 (3차 동일) =====
+// ===== 인기 질문 =====
 let _popularCache = null;
 async function fetchPopularQuestions(forceRefresh = false) {
   if (_popularCache && !forceRefresh) return _popularCache;
@@ -351,7 +343,7 @@ document.getElementById('chat-input').addEventListener('keydown', function (e) {
 document.getElementById('send-btn').addEventListener('click', sendMessage);
 document.getElementById('new-chat-btn').addEventListener('click', createNewSession);
 
-// ===== 사이드바 리사이즈 (3차 initSidebarResize 그대로) =====
+// ===== 사이드바 리사이즈 =====
 (function initSidebarResize() {
   const handle = document.getElementById('sidebar-resize-handle');
   const sidebar = document.getElementById('sidebar');
@@ -377,6 +369,5 @@ document.getElementById('new-chat-btn').addEventListener('click', createNewSessi
 })();
 
 // ===== 초기화 =====
-updateRegionBadge();
 restoreAllSessions();
 loadPopularQuestions();

@@ -28,7 +28,7 @@
         {% for e in form.phone.errors %}<p class="form-error">{{ e }}</p>{% endfor %}</div>
       <button type="submit" class="btn btn-primary btn-full">저장</button>
     </form>
-    <p class="login-link"><a href="{% url 'members:profile' %}">← 프로필로 돌아가기</a></p>
+    <p class="login-link"><a href="{% url 'members:mypage' %}">← 마이페이지로 돌아가기</a></p>
   </div>
 </div>
 {% endblock %}

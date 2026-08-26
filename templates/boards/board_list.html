@@ -58,6 +58,7 @@
       {% for board in boards %}
       <a href="{% url 'boards:detail' board.pk %}" class="comm-card">
         <div class="comm-card-badges">
+          {% if board.is_hidden %}<span class="badge badge-hidden">비공개</span>{% endif %}
           {% if board.like_count >= 5 %}<span class="badge badge-hot">인기</span>{% endif %}
           {% if board.category == 'question' %}<span class="badge badge-question">질문</span>
           {% elif board.category == 'info' %}<span class="badge badge-info">정보공유</span>

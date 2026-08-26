@@ -10,7 +10,8 @@
         <div class="land-nav-right">
           {% if user.is_authenticated %}
             <a class="btn btn-outline btn-sm" href="{% url 'chat:room' %}" style="text-decoration:none;">💬 챗봇</a>
-            <a class="land-avatar" href="{% url 'members:profile' %}" title="{{ user.community_name }}">
+            <a class="btn btn-outline btn-sm" href="{% url 'members:mypage' %}" style="text-decoration:none;">👤 마이페이지</a>
+            <a class="land-avatar" href="{% url 'members:mypage' %}" title="{{ user.community_name }}">
               {{ user.community_name|first }}
             </a>
           {% else %}

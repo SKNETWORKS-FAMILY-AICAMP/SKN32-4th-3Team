@@ -22,6 +22,7 @@ Ecobot 관례를 얹었습니다.
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import F, Q
+from django.utils import timezone
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -100,7 +101,13 @@ class BoardListView(CommunityAccessRequiredMixin, ListView):
         if self.apartment:
             qs = qs.filter(apartment=self.apartment)
         elif not self.request.user.is_service_admin:
-            qs = qs.none()  # CommunityAccessRequiredMixin 이 이미 막아 이론상 도달 불가
+            qs = qs.none()
+        # 비공개 글: 관리자에게는 보이고, 일반 사용자에게는 숨김
+        self.is_manager = permissions.can_manage_apartment(
+            self.request.user, self.apartment.id if self.apartment else None
+        )
+        if not self.is_manager:
+            qs = qs.filter(is_hidden=False)
         region = self.request.GET.get("region", "").strip()
         if region:
             qs = qs.filter(region=region)
@@ -134,6 +141,7 @@ class BoardListView(CommunityAccessRequiredMixin, ListView):
         params = self.request.GET.copy()
         params.pop("page", None)
         ctx["qs_keep"] = params.urlencode()
+        ctx["is_manager"] = self.is_manager
         # 유저의 아파트명 (임시: region 기반)
         if self.request.user.is_authenticated:
             ctx["apartment_name"] = f"{self.request.user.get_region_display()} 에코빌"
@@ -166,10 +174,11 @@ class BoardDetailView(BoardObjectAccessMixin, DetailView):
             ).exists()
         else:
             ctx["user_liked"] = False
+        is_manager = permissions.can_manage_apartment(self.request.user, board.apartment_id)
         ctx["can_delete"] = (
-            board.author_id == self.request.user.id
-            or permissions.can_manage_apartment(self.request.user, board.apartment_id)
+            board.author_id == self.request.user.id or is_manager
         )
+        ctx["is_manager"] = is_manager
         return ctx
 
 
@@ -235,6 +244,30 @@ class BoardDeleteView(BoardDeletePermissionMixin, DeleteView):
         return super().form_valid(form)
 
 
+class BoardHideView(BoardDeletePermissionMixin, View):
+    """게시글 비공개/공개 토글 — POST 전용. 관리자(관리사무소/서비스운영자)만."""
+
+    model = Board
+
+    def post(self, request, pk):
+        board = self.get_object()
+        if board.is_hidden:
+            # 공개로 전환
+            board.is_hidden = False
+            board.hidden_by = None
+            board.hidden_at = None
+            board.save(update_fields=["is_hidden", "hidden_by", "hidden_at"])
+            messages.success(request, "게시글이 공개 처리되었습니다.")
+        else:
+            # 비공개로 전환
+            board.is_hidden = True
+            board.hidden_by = request.user
+            board.hidden_at = timezone.now()
+            board.save(update_fields=["is_hidden", "hidden_by", "hidden_at"])
+            messages.success(request, "게시글이 비공개 처리되었습니다.")
+        return redirect("boards:detail", pk=pk)
+
+
 class BoardLikeView(LoginRequiredMixin, View):
     """좋아요 토글 — POST 전용. JSON 응답."""
 
@@ -269,11 +302,13 @@ class CommentCreateView(LoginRequiredMixin, View):
 
 
 class CommentDeleteView(LoginRequiredMixin, View):
-    """댓글 삭제 — POST 전용. 작성자 본인만."""
+    """댓글 삭제 — POST 전용. 작성자 본인 또는 관리자."""
 
     def post(self, request, pk, comment_pk):
         comment = get_object_or_404(Comment, pk=comment_pk, board_id=pk)
-        if comment.author_id != request.user.id:
+        board = get_object_or_404(Board, pk=pk)
+        is_manager = permissions.can_manage_apartment(request.user, board.apartment_id)
+        if comment.author_id != request.user.id and not is_manager:
             messages.error(request, "본인 댓글만 삭제할 수 있습니다.")
         else:
             comment.delete()

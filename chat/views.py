@@ -62,7 +62,10 @@ class ChatRoomView(LoginRequiredMixin, View):
     """
 
     def get(self, request):
-        from apartments import permissions as apt_permissions
+        from apartments import permissions as apt_permissions, scope as apt_scope
+
+        apartment = apt_scope.current_apartment(request)
+        membership = apt_scope.current_membership(request)
 
         return render(
             request,
@@ -75,6 +78,9 @@ class ChatRoomView(LoginRequiredMixin, View):
                 # design 변경(2R-2): 승인된 단지 소속(또는 서비스 운영자)이
                 # 없으면 커뮤니티 진입 버튼 자체를 숨긴다.
                 "can_access_community": apt_permissions.has_community_access(request),
+                # 4차 UI 리디자인: 사이드바에 단지명·역할 표시
+                "apartment_name": str(apartment) if apartment else None,
+                "membership_role": membership.get_role_display() if membership else None,
             },
         )
 

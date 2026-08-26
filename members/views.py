@@ -24,6 +24,9 @@ from django.views import View
 
 from .forms import LoginForm, ProfileForm, SignUpForm
 
+from apartments import scope as apt_scope
+from apartments.models import Membership
+
 
 class HomeView(View):
     """랜딩 화면. 로그인 여부와 무관하게 접근 가능합니다.
@@ -146,7 +149,49 @@ class ProfileUpdateView(LoginRequiredMixin, View):
                 request, "members/profile_form.html", {"form": form}, status=400
             )
         form.save()
-        return redirect("members:profile")
+        return redirect("members:mypage")
+
+
+class MyPageView(LoginRequiredMixin, View):
+    """마이페이지 — 프로필·내 단지·활동 내역·설정을 탭으로 통합."""
+
+    def get(self, request):
+        from boards.models import Board, BoardLike, Comment
+
+        user = request.user
+        memberships = Membership.objects.filter(member=user).select_related("apartment").order_by("-applied_at")
+        active_membership = apt_scope.current_membership(request)
+
+        # 활동 내역 통계
+        board_count = Board.objects.filter(author=user).count()
+        comment_count = Comment.objects.filter(author=user).count()
+        like_count = BoardLike.objects.filter(user=user).count()
+
+        # 최근 작성 글
+        recent_boards = Board.objects.filter(author=user).order_by("-created_at")[:5]
+        # 최근 댓글
+        recent_comments = Comment.objects.filter(author=user).select_related("board").order_by("-created_at")[:5]
+        # 좋아요한 글
+        liked_boards = Board.objects.filter(likes__user=user).order_by("-likes__created_at")[:5]
+
+        # 중간관리자 여부
+        is_manager = (
+            active_membership is not None
+            and active_membership.role == Membership.Role.MANAGER
+        )
+
+        return render(request, "members/mypage.html", {
+            "memberships": memberships,
+            "active_membership": active_membership,
+            "is_manager": is_manager,
+            "board_count": board_count,
+            "comment_count": comment_count,
+            "like_count": like_count,
+            "recent_boards": recent_boards,
+            "recent_comments": recent_comments,
+            "liked_boards": liked_boards,
+            "profile_form": ProfileForm(instance=user),
+        })
 
 
 class WithdrawView(LoginRequiredMixin, View):
