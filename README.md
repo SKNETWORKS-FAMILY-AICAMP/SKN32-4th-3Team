@@ -96,48 +96,6 @@ SKN32-4th-3Team/
 
 ---
 
-## 파이썬 버전 · 팀원 환경
-
-- **지원 범위**: 3.10 ~ 3.13 (3.11 · 3.12 에서 색인·기동까지 검증)
-- **3.9 이하 불가**: 코드가 `str | None` 문법 사용
-- **`.python-version`**: 3.12 고정 — uv · pyenv 가 없는 버전을 자동으로 받아 맞춤
-- **3.12 전용 문법 미사용**
-
-### `mysqlclient` 설치 실패 시
-
-C 확장이고 PyPI 에 **Windows 휠만** 제공 (2.2.8 기준).
-증상: `Exception: Can not find valid pkg-config name.`
-
-| 환경 | 필요한 것 |
-|---|---|
-| Windows | 없음 — 휠로 바로 설치 |
-| Linux | `sudo apt install default-libmysqlclient-dev` |
-| macOS | `brew install mysql-client pkg-config` |
-
-→ **개발 중이면 `DB_ENGINE=sqlite3`** 으로 `mysqlclient` 자체를 회피 (퀵스타트 경로). MySQL 은 서버 전용.
-
-### uv 사용 시
-
-```bash
-uv venv --python 3.12 .venv
-uv pip install -r requirements.txt
-```
-
-- **Windows · macOS · Linux 공통** — `uv pip install` 이 현재 디렉터리의 `.venv` 를 자동 탐색 (활성화 · 인터프리터 경로 불필요)
-- **`python3.x-venv` 시스템 패키지 없이** venv 생성, 없는 파이썬 버전 자동 다운로드
-- **`mysqlclient` 빌드 의존성은 uv 로도 우회 불가**
-
-대상을 명시할 경우 경로가 OS 별로 다름:
-
-```bash
-# Windows
-uv pip install --python .venv\Scripts\python.exe -r requirements.txt
-# macOS/Linux
-uv pip install --python .venv/bin/python -r requirements.txt
-```
-
----
-
 ## 설치 및 실행
 
 ### 1. 클론 및 가상환경
@@ -153,6 +111,9 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
+- **Python 3.10 ~ 3.13** (3.11 · 3.12 에서 색인·기동까지 검증). 3.9 이하는 `str | None` 문법 때문에 불가
+- **`.python-version`**: 3.12 고정 — uv · pyenv 가 없는 버전을 자동으로 받아 맞춤
+
 > ⚠️ **Windows: 프로젝트를 영문 경로에** (예: `C:\proj4`)
 > 경로에 한글이 섞이면 색인 단계에서 `Illegal byte sequence ... index.faiss for writing` 실패 —
 > FAISS 가 C++ 에서 파일을 직접 열어 경로 인코딩 전달 불가.
@@ -167,6 +128,15 @@ pip install -r requirements-quickstart.txt
 # 실사용 (MySQL + OpenAI)
 pip install -r requirements.txt
 ```
+
+**uv 를 쓴다면** — Windows · macOS · Linux 공통:
+
+```bash
+uv venv --python 3.12 .venv
+uv pip install -r requirements.txt
+```
+
+`uv pip install` 이 현재 디렉터리의 `.venv` 를 자동 탐색 (활성화 · 인터프리터 경로 불필요). `python3.x-venv` 시스템 패키지 없이 venv 생성, 없는 파이썬 버전 자동 다운로드.
 
 ### 3. 환경변수 설정
 
@@ -203,7 +173,7 @@ LLM_BACKEND=openai
 > CREATE DATABASE ecora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 > ```
 >
-> `mysqlclient` 설치 실패 시 → [파이썬 버전 · 팀원 환경](#파이썬-버전--팀원-환경)
+> `mysqlclient` 설치 실패 시 → [설치 문제 해결](#설치-문제-해결)
 
 ### 4. DB 초기화 및 실행
 
@@ -225,6 +195,36 @@ python manage.py runserver
 | `seed_docs` | 법령·가이드 문서를 DB에 적재 |
 | `rag_reindex` | FAISS 벡터 색인 빌드 |
 | `seed_apartments` | 데모 단지 및 샘플 규정 생성 |
+
+---
+
+## 설치 문제 해결
+
+### `mysqlclient` 설치 실패
+
+C 확장이고 PyPI 에 **Windows 휠만** 제공 (2.2.8 기준).
+증상: `Exception: Can not find valid pkg-config name.`
+
+| 환경 | 필요한 것 |
+|---|---|
+| Windows | 없음 — 휠로 바로 설치 |
+| Linux | `sudo apt install default-libmysqlclient-dev` |
+| macOS | `brew install mysql-client pkg-config` |
+
+→ **개발 중이면 `DB_ENGINE=sqlite3`** 으로 `mysqlclient` 자체를 회피 (퀵스타트 경로). MySQL 은 서버 전용.
+
+### uv 에서 대상을 명시할 때
+
+자동 탐색이 안 될 경우 경로가 OS 별로 다름:
+
+```bash
+# Windows
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+# macOS/Linux
+uv pip install --python .venv/bin/python -r requirements.txt
+```
+
+`mysqlclient` 빌드 의존성은 uv 로도 우회 불가.
 
 ---
 
