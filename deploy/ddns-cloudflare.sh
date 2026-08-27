@@ -2,19 +2,18 @@
 #
 # Cloudflare DDNS — 공인 IP 가 바뀌면 A 레코드를 따라가게 합니다.
 #
-# 왜 필요한가: 이 서버는 가정 회선이라 공인 IP 가 고정이 아닙니다. IP 가
-# 바뀌면 A 레코드가 옛 주소를 가리킨 채 남고, **ecobotapt.com 과
-# 기존-사이트.example.com 이 함께 죽습니다.** 도메인이 둘로 늘면서 영향 범위도
-# 늘었으므로 자동화해 둡니다.
+# 왜 필요한가: 이 서버는 동적 IP 회선이라 공인 IP 가 고정이 아닙니다. IP 가
+# 바뀌면 A 레코드가 옛 주소를 가리킨 채 남고 **사이트가 죽습니다.** 같은
+# 회선에 도메인이 여럿이면 전부 함께 죽으므로 자동화해 둡니다.
 #
-# 두 도메인은 서로 다른 zone 이지만 같은 Cloudflare 계정이라 토큰 하나로
-# 처리됩니다. zone 은 FQDN 에서 자동으로 찾습니다.
+# 여러 zone 을 갱신해도 같은 Cloudflare 계정이면 토큰 하나로 처리됩니다.
+# zone 은 FQDN 에서 자동으로 찾습니다.
 #
 # 설정:  /etc/ddns-cloudflare/config.env  (0600, root)
 #     CF_API_TOKEN=...
-#     DDNS_RECORDS="ecobotapt.com www.ecobotapt.com 기존-사이트.example.com"
+#     DDNS_RECORDS="ecobotapt.com www.ecobotapt.com"
 #
-# 수동 실행:  sudo $PROJECT_DIR/deploy/ddns-cloudflare.sh
+# 수동 실행:  sudo <저장소>/deploy/ddns-cloudflare.sh
 # 자동 실행:  systemd timer (ddns-cloudflare.timer)
 # 로그:       journalctl -u ddns-cloudflare
 

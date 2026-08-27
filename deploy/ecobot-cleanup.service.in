@@ -10,7 +10,7 @@
 # 수동 실행(기본 24시간)보다 훨씬 보수적으로 잡습니다.
 #
 # ⚠️ 이 유닛은 파일을 **되돌릴 수 없게** 지웁니다. 무엇이 지워지는지
-#    먼저 보려면 앱 계정 계정에서 (삭제 없이):
+#    먼저 보려면 앱 계정에서 (삭제 없이):
 #      .venv/bin/python manage.py cleanup_orphan_files
 #
 # 로그:  journalctl -u ecobot-cleanup

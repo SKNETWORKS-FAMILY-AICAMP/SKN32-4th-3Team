@@ -1,9 +1,11 @@
 # systemd 유닛 — EcoBot (ecobotapt.com)
 #
-# 설치:
-#   sudo cp deploy/ecobot.service /etc/systemd/system/ecobot.service
-#   sudo systemctl daemon-reload
-#   sudo systemctl enable --now ecobot
+# 이 파일은 **템플릿**입니다. @PROJECT_DIR@ · @APP_USER@ 를 실제 값으로
+# 치환해야 동작합니다 — systemd 는 User= · WorkingDirectory= 에 변수 확장을
+# 지원하지 않아 리터럴이어야 하기 때문입니다.
+#
+# 설치 (치환은 스크립트가 합니다):
+#   sudo bash deploy/install-system.sh service
 #
 # 확인:
 #   systemctl status ecobot

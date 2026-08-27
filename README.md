@@ -212,7 +212,7 @@ Caddy (443) ──▶ gunicorn (127.0.0.1:8000) ──▶ Django ──▶ MySQL
 | `requirements-prod.txt` | 운영 의존성 (torch 계열 제외, gunicorn·whitenoise 추가) |
 | `.env.production.example` | 운영 환경변수 예시 |
 | `deploy/gunicorn.conf.py` | WSGI 서버 설정 |
-| `deploy/ecobot.service` | systemd 유닛 |
+| `deploy/ecobot.service.in` | systemd 유닛 **템플릿** (설치 시 경로·계정 치환) |
 | `deploy/Caddyfile.ecobotapt` | Caddy 사이트 블록 |
 | `deploy/install-system.sh` | root 권한이 필요한 작업 (apt·MySQL·systemd·Caddy·DDNS) |
 | `deploy/ddns-cloudflare.*` | 공인 IP 변경 시 A 레코드 자동 갱신 |
@@ -222,6 +222,7 @@ Caddy (443) ──▶ gunicorn (127.0.0.1:8000) ──▶ Django ──▶ MySQL
 
 배포 전 반드시 확인할 것:
 
+- 유닛은 `.in` 템플릿입니다 — `cp` 가 아니라 `install-system.sh` 로 설치하십시오
 - `collectstatic` 실행 — 빠뜨리면 **모든 페이지가 500** 입니다
 - `.env` 의 `DJANGO_DEBUG=False`, `DJANGO_BEHIND_PROXY=True`
 - OpenAI 대시보드에서 **월 사용 한도** 설정 (회원가입이 열려 있고 rate limit 이 없습니다)

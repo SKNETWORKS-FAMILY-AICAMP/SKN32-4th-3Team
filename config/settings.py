@@ -106,7 +106,7 @@ MIDDLEWARE = [
     # 이게 없으면 배포 직후 CSS · JS 가 전부 404 가 됩니다.
     #
     # 앞단 Caddy 가 직접 서빙하는 편이 더 빠르지만, Caddy 는 caddy 사용자로
-    # 돌고 홈 디렉터리(<앱계정 홈>, 0750)를 통과하지 못합니다. 권한을 푸는
+    # 돌고 앱 계정 홈(0750)을 통과하지 못합니다. 권한을 푸는
     # 대신 WhiteNoise 를 씁니다 — 경로 결합이 없어 이전에도 그대로 동작합니다.
     # (SecurityMiddleware 바로 다음이어야 합니다. 순서를 바꾸지 마십시오.)
     "whitenoise.middleware.WhiteNoiseMiddleware",

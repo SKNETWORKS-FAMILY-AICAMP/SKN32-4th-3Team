@@ -32,7 +32,7 @@ keepalive = 5
 # ── 컨트롤 소켓 끄기 ──
 # gunicorn 26 은 런타임 명령용 유닉스 소켓을 만듭니다. 기본 위치는
 # $XDG_RUNTIME_DIR 인데, systemd 시스템 서비스로 돌면 그 변수가 없어서
-# ~/.gunicorn 으로 떨어집니다. 유닛의 ProtectHome=read-only 에 막혀
+# 앱 계정 홈의 ~/.gunicorn 으로 떨어집니다. 유닛의 ProtectHome=read-only 에 막혀
 # 기동할 때마다 이런 오류가 남습니다:
 #
 #   [ERROR] Control server error: [Errno 30] Read-only file system: '<앱계정 홈>/.gunicorn'

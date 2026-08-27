@@ -2,20 +2,23 @@
 #
 # EcoBot 시스템 설치 — root 권한이 필요한 작업만 모았습니다.
 #
-# 이 저장소는 앱 계정 소유이고 <앱계정 홈> 는 0750 입니다. sudo 를 가진
-# 계정(관리 계정)은 이 디렉터리를 **통과조차 못 합니다**. 그래서
+# 계정이 둘로 나뉜 서버를 전제로 합니다:
+#   앱 계정   — 저장소 소유자. 앱을 실행하지만 sudo 가 없다
+#   관리 계정 — sudo 를 가졌지만 앱 계정 홈이 0750 이면 **통과조차 못 한다**
+#
+# 그 경우 아래 같은 형태가 실패합니다:
 #
 #     sudo tee -a /etc/caddy/Caddyfile < deploy/Caddyfile.ecobotapt
 #
-# 같은 형태는 실패합니다 — 리다이렉트(<)는 sudo 가 아니라 **셸**이 수행하므로
-# 관리 계정 권한으로 파일을 열려다 Permission denied 가 납니다.
+# 리다이렉트(<)는 sudo 가 아니라 **셸**이 수행하므로, 파일을 여는 주체가
+# 여전히 관리 계정이라 Permission denied 가 납니다.
 #
 # 이 스크립트는 전체가 root 로 실행되므로 그 문제가 없습니다.
-# 실행 위치는 상관없습니다(모든 경로가 절대 경로입니다).
+# 실행 위치는 상관없습니다(경로를 스크립트 위치에서 유도합니다).
 #
-#   sudo bash $PROJECT_DIR/deploy/install-system.sh deps
-#   sudo bash $PROJECT_DIR/deploy/install-system.sh service
-#   sudo bash $PROJECT_DIR/deploy/install-system.sh caddy
+#   sudo bash <저장소>/deploy/install-system.sh deps
+#   sudo bash <저장소>/deploy/install-system.sh service
+#   sudo bash <저장소>/deploy/install-system.sh caddy
 #
 # 런북(docs/deploy.md)의 순서대로 deps → (사람이 .env·DB 준비) →
 # service → caddy 로 나눠 두었습니다. `all` 은 셋을 연달아 실행합니다.
@@ -24,11 +27,18 @@
 
 set -euo pipefail
 
-PROJECT_DIR="$PROJECT_DIR"
-APP_USER="앱 계정"
+# 저장소 경로와 앱 계정을 스크립트 자신에게서 유도합니다. 어디에 클론하든
+# 어떤 계정으로 돌리든 동작하고, 개인 환경이 저장소에 박히지 않습니다.
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 앱을 실행할 계정 = 저장소 소유자. root 로 도는 중이라 0750 홈도 읽습니다.
+APP_USER="$(stat -c %U "$PROJECT_DIR")"
+
 CADDYFILE="/etc/caddy/Caddyfile"
-DOMAIN="ecobotapt.com"
-SERVER_IP="<서버 공인 IP>"
+DOMAIN="${DOMAIN:-ecobotapt.com}"
+# 공인 IP 는 박아두지 않습니다 — DDNS 를 돌린다는 것 자체가 이 값이 변한다는
+# 뜻입니다. 비워두면 caddy 단계에서 실측합니다. SERVER_IP=x.x.x.x 로 덮어쓸 수
+# 있습니다(오프라인 설치 등).
+SERVER_IP="${SERVER_IP:-}"
 
 say()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
@@ -66,6 +76,38 @@ esac
 [[ -d $PROJECT_DIR ]] || die "$PROJECT_DIR 가 없습니다"
 
 
+# 유닛 템플릿(.in)을 실제 값으로 치환해 설치합니다.
+#
+# systemd 는 User= · WorkingDirectory= · ReadWritePaths= 에 변수 확장을
+# 지원하지 않습니다(ExecStart 만 예외). 그래서 저장소에는 @PROJECT_DIR@ ·
+# @APP_USER@ 가 든 템플릿만 두고, 실제 값은 설치 시점에 여기서 채웁니다.
+#
+# ⚠️ 그래서 `cp deploy/*.service /etc/systemd/system/` 로는 설치되지 않습니다.
+render_unit() {
+    local name="$1"
+    local src="$PROJECT_DIR/deploy/$name.in"
+    local dst="/etc/systemd/system/$name"
+    [[ -f $src ]] || die "$src 가 없습니다"
+
+    local tmp
+    tmp=$(mktemp)
+    sed -e "s#@PROJECT_DIR@#$PROJECT_DIR#g" \
+        -e "s#@APP_USER@#$APP_USER#g" "$src" > "$tmp"
+
+    # 자리표시자가 남으면 systemd 가 조용히 이상하게 동작합니다(경로가
+    # "@PROJECT_DIR@/..." 인 유닛은 기동 실패로만 드러납니다). 여기서 막습니다.
+    if grep -qE '@[A-Z_]+@' "$tmp"; then
+        warn "$(grep -nE '@[A-Z_]+@' "$tmp" | head -3)"
+        rm -f "$tmp"
+        die "$name 에 치환되지 않은 자리표시자가 남았습니다"
+    fi
+
+    install -m 644 -o root -g root "$tmp" "$dst"
+    rm -f "$tmp"
+    ok "$dst 설치됨"
+}
+
+
 install_deps() {
     say "1) 시스템 패키지"
     # mysqlclient 는 C 확장이고 PyPI 에 Windows 휠만 있습니다.
@@ -84,7 +126,7 @@ install_deps() {
 
     cat <<MSG
 
-  다음은 앱 계정 계정에서 (sudo 불필요):
+  다음은 $APP_USER 계정에서 (sudo 불필요):
       cd $PROJECT_DIR
       uv pip install --python .venv/bin/python -r requirements-prod.txt
 MSG
@@ -94,7 +136,7 @@ MSG
 install_db() {
     say "2) MySQL 데이터베이스 · 계정"
     local envfile="$PROJECT_DIR/.env"
-    [[ -f $envfile ]] || die "$envfile 가 없습니다. 앱 계정 계정에서 먼저 작성하십시오"
+    [[ -f $envfile ]] || die "$envfile 가 없습니다. $APP_USER 계정에서 먼저 작성하십시오"
 
     # 비밀번호를 여기에 적지 않고 .env 에서 읽습니다. 두 곳에 적으면 반드시
     # 어긋나고, 그때 증상이 "Django 만 접속 실패"라 원인에서 멉니다.
@@ -112,7 +154,7 @@ install_db() {
         || die "DB_PASSWORD 에 작은따옴표가 있으면 이 스크립트로 처리할 수 없습니다"
 
     # MySQL root 는 auth_socket 이라 OS root 로만 붙습니다(그래서 이 단계가
-    # 앱 계정 계정에서 불가능합니다). 아래는 몇 번 돌려도 안전합니다.
+    # 앱 계정에서 불가능합니다). 아래는 몇 번 돌려도 안전합니다.
     mysql <<SQL
 CREATE DATABASE IF NOT EXISTS \`$name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$user'@'localhost' IDENTIFIED BY '$pass';
@@ -132,7 +174,7 @@ SQL
 
     cat <<MSG
 
-  다음은 앱 계정 계정에서 (sudo 불필요):
+  다음은 $APP_USER 계정에서 (sudo 불필요):
       cd $PROJECT_DIR
       .venv/bin/python manage.py migrate
       .venv/bin/python manage.py createsuperuser
@@ -145,17 +187,13 @@ MSG
 
 install_service() {
     say "3) systemd 유닛"
-    local src="$PROJECT_DIR/deploy/ecobot.service"
-    [[ -f $src ]] || die "$src 가 없습니다"
-
-    install -m 644 -o root -g root "$src" /etc/systemd/system/ecobot.service
+    render_unit ecobot.service
     systemctl daemon-reload
-    ok "/etc/systemd/system/ecobot.service 설치됨"
 
-    # 유닛은 User=앱 계정 로 돌고 경로가 전부 절대 경로입니다. 누가 설치하든
+    # 유닛은 앱 계정으로 돌고 경로가 전부 절대 경로입니다. 누가 설치하든
     # 서비스는 앱 계정 권한으로 실행되므로 파일 소유권을 바꿀 필요가 없습니다.
     [[ -x "$PROJECT_DIR/.venv/bin/gunicorn" ]] \
-        || die ".venv/bin/gunicorn 이 없습니다. 앱 계정 계정에서 의존성을 먼저 설치하십시오"
+        || die ".venv/bin/gunicorn 이 없습니다. $APP_USER 계정에서 의존성을 먼저 설치하십시오"
     [[ -f "$PROJECT_DIR/.env" ]] \
         || die ".env 가 없습니다. 런북 3단계를 먼저 끝내십시오"
     ok "gunicorn · .env 확인됨"
@@ -184,12 +222,27 @@ install_caddy() {
 
     # DNS 가 먼저여야 합니다. 없는 상태로 reload 하면 Let's Encrypt 검증이
     # 실패하고, 반복하면 발급 한도에 걸려 몇 시간 막힙니다.
-    local resolved
+    local resolved expected
     resolved=$(getent hosts "$DOMAIN" | awk '{print $1}' | head -1 || true)
-    if [[ $resolved != "$SERVER_IP" ]]; then
-        die "DNS 미확인: $DOMAIN → '${resolved:-없음}' (기대: $SERVER_IP)"
+    # 아직 안 풀리는 경우가 실제로 겪는 실패입니다 — 여기서 반드시 멈춥니다.
+    [[ -n $resolved ]] || die "DNS 미확인: $DOMAIN 이 아직 풀리지 않습니다"
+
+    expected="$SERVER_IP"
+    if [[ -z $expected ]]; then
+        expected=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)
     fi
-    ok "DNS 확인됨 ($DOMAIN → $SERVER_IP)"
+
+    if [[ -z $expected ]]; then
+        # 실측에 실패해도(오프라인·서비스 장애) 배포를 막지는 않습니다. 위의
+        # "풀리는가" 검사는 이미 통과했고, 남은 것은 "이 서버가 맞는가"입니다.
+        warn "공인 IP 를 확인하지 못해 대조를 건너뜁니다."
+        warn "$DOMAIN → $resolved 가 이 서버가 맞는지 직접 확인하십시오."
+        warn "(SERVER_IP=x.x.x.x sudo -E bash $0 caddy 로 지정할 수 있습니다)"
+    elif [[ $resolved != "$expected" ]]; then
+        die "DNS 불일치: $DOMAIN → '$resolved' (이 서버의 공인 IP: $expected)"
+    else
+        ok "DNS 확인됨 ($DOMAIN → $resolved)"
+    fi
 
     if grep -q "$DOMAIN" "$CADDYFILE"; then
         warn "$CADDYFILE 에 $DOMAIN 블록이 이미 있습니다 — 추가하지 않습니다"
@@ -209,7 +262,7 @@ install_caddy() {
     fi
 
     systemctl reload caddy
-    ok "caddy reload 됨 (무중단 — 기존-사이트.example.com 은 끊기지 않습니다)"
+    ok "caddy reload 됨 (무중단 — 기존 사이트는 끊기지 않습니다)"
 
     cat <<MSG
 
@@ -287,20 +340,20 @@ install_ddns() {
 #   → "Edit zone DNS" 템플릿
 #   → Permissions : Zone / DNS / Edit
 #   → Zone Resources: Include / Specific zone → ecobotapt.com
-#                     (+ Add more) Include / Specific zone → example.com
-#   → 두 zone 을 모두 넣어야 위키까지 따라갑니다.
+#   → 다른 도메인도 함께 갱신하려면 (+ Add more) 로 그 zone 도 넣으십시오.
 
 CF_API_TOKEN=
 
 # 공백으로 구분. 여기 적힌 A 레코드만 갱신합니다(이미 존재해야 합니다).
-DDNS_RECORDS="ecobotapt.com www.ecobotapt.com 기존-사이트.example.com"
+# 같은 회선의 다른 도메인도 함께 갱신하려면 공백으로 이어 붙이십시오.
+DDNS_RECORDS="ecobotapt.com www.ecobotapt.com"
 CFG
         chmod 600 "$cfg"
         ok "설정 템플릿 생성: $cfg"
     fi
 
-    install -m 644 -o root -g root "$src/ddns-cloudflare.service" /etc/systemd/system/
-    install -m 644 -o root -g root "$src/ddns-cloudflare.timer"   /etc/systemd/system/
+    render_unit ddns-cloudflare.service
+    install -m 644 -o root -g root "$src/ddns-cloudflare.timer" /etc/systemd/system/
     systemctl daemon-reload
     ok "유닛 설치됨"
 
@@ -334,16 +387,16 @@ install_reindex() {
     local vdir="$PROJECT_DIR/vector_db"
 
     [[ -x "$PROJECT_DIR/.venv/bin/python" ]] \
-        || die ".venv 가 없습니다. 앱 계정 계정에서 의존성을 먼저 설치하십시오"
+        || die ".venv 가 없습니다. $APP_USER 계정에서 의존성을 먼저 설치하십시오"
 
     # 트리거·락 파일이 여기 생깁니다. 웹 프로세스(앱 계정)가 써야 하므로
     # 소유자를 맞춰 둡니다.
     install -d -o "$APP_USER" -g "$APP_USER" "$vdir"
     ok "vector_db/ 준비됨"
 
-    install -m 644 -o root -g root "$src/ecobot-reindex.service" /etc/systemd/system/
-    install -m 644 -o root -g root "$src/ecobot-reindex.path"    /etc/systemd/system/
-    install -m 644 -o root -g root "$src/ecobot-reindex.timer"   /etc/systemd/system/
+    render_unit ecobot-reindex.service
+    render_unit ecobot-reindex.path
+    install -m 644 -o root -g root "$src/ecobot-reindex.timer" /etc/systemd/system/
     systemctl daemon-reload
     ok "유닛 3개 설치됨 (service · path · timer)"
 
@@ -375,7 +428,7 @@ install_reindex() {
       journalctl -u ecobot-reindex -f      # 색인 로그
       systemctl list-timers ecobot-reindex # 다음 안전망 실행
 
-  ⚠️ 코드가 바뀌었으므로 앱 계정 계정에서 마이그레이션이 필요합니다:
+  ⚠️ 코드가 바뀌었으므로 $APP_USER 계정에서 마이그레이션이 필요합니다:
       cd $PROJECT_DIR && .venv/bin/python manage.py migrate
 MSG
 }
@@ -386,7 +439,7 @@ install_cleanup() {
     local src="$PROJECT_DIR/deploy"
 
     [[ -x "$PROJECT_DIR/.venv/bin/python" ]] \
-        || die ".venv 가 없습니다. 앱 계정 계정에서 의존성을 먼저 설치하십시오"
+        || die ".venv 가 없습니다. $APP_USER 계정에서 의존성을 먼저 설치하십시오"
 
     # 켜기 전에 무엇이 지워질지 보여 줍니다. 자동 삭제를 붙이는 작업이라
     # "설치했더니 파일이 사라졌다"가 되지 않게 합니다.
@@ -397,8 +450,8 @@ install_cleanup() {
         --min-age-hours 168 2>/dev/null | sed "s/^/    /"
     echo
 
-    install -m 644 -o root -g root "$src/ecobot-cleanup.service" /etc/systemd/system/
-    install -m 644 -o root -g root "$src/ecobot-cleanup.timer"   /etc/systemd/system/
+    render_unit ecobot-cleanup.service
+    install -m 644 -o root -g root "$src/ecobot-cleanup.timer" /etc/systemd/system/
     systemctl daemon-reload
     ok "유닛 2개 설치됨"
 
@@ -412,7 +465,7 @@ install_cleanup() {
       sudo systemctl start ecobot-cleanup
       journalctl -u ecobot-cleanup -n 30 --no-pager
 
-  삭제 없이 목록만 보려면 (앱 계정 계정):
+  삭제 없이 목록만 보려면 ($APP_USER 계정):
       cd $PROJECT_DIR
       .venv/bin/python manage.py cleanup_orphan_files
 MSG

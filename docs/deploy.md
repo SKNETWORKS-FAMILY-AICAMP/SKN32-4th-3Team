@@ -1,13 +1,13 @@
 # 배포 런북 — ecobotapt.com
 
-이 서버(공인 IP `<서버 공인 IP>`)에는 이미 Caddy가 `기존-사이트.example.com`을
-서빙하고 있습니다. EcoBot은 **같은 Caddy에 사이트 블록 하나를 더 얹는**
-방식으로 붙습니다. 포트를 새로 열거나 공유기 설정을 바꿀 필요가 없습니다.
+이 서버에는 이미 Caddy가 다른 사이트를 서빙하고 있습니다. EcoBot은 **같은
+Caddy에 사이트 블록 하나를 더 얹는** 방식으로 붙습니다. 포트를 새로 열거나
+앞단 라우터 설정을 바꿀 필요가 없습니다.
 
 ```
 인터넷 ──443──▶ Caddy (v2.11.4)
-                 ├── 기존-사이트.example.com  ──▶ 127.0.0.1:3000  (Next.js, 기존)
-                 └── ecobotapt.com      ──▶ 127.0.0.1:8000  (EcoBot, 신규)
+                 ├── 기존-사이트.example.com ──▶ 127.0.0.1:3000  (기존)
+                 └── ecobotapt.com           ──▶ 127.0.0.1:8000  (EcoBot, 신규)
                                                 │
                                           gunicorn (systemd: ecobot)
                                                 │
@@ -21,18 +21,36 @@ Caddy는 TLS 핸드셰이크의 SNI와 Host 헤더만 보고 블록을 고르므
 
 ---
 
+## 이 문서의 표기
+
+명령에 나오는 아래 두 값은 **환경에 맞게 바꿔 읽으십시오.** 그대로 복사해
+쓰려면 세션마다 한 번 export 해 두면 됩니다.
+
+```bash
+export PROJECT_DIR=/srv/ecobot     # 저장소를 클론한 경로
+export APP_USER=ecobot             # 앱을 실행할 계정 (= 저장소 소유자)
+```
+
+`deploy/install-system.sh` 는 이 둘을 **스크립트 자신의 위치와 저장소
+소유자에서 자동으로 유도**하므로, 스크립트를 쓸 때는 export 가 필요 없습니다.
+
+---
+
 ## 계정 구조 — 먼저 읽으십시오
 
-이 서버는 **두 계정으로 나뉘어** 있고, 그 경계가 배포 명령에 직접 영향을 줍니다.
+이 런북은 **계정이 둘로 나뉜** 서버를 전제로 합니다. 그 경계가 배포 명령에
+직접 영향을 줍니다.
 
-| 계정 | uid | sudo | 역할 |
-|---|---|---|---|
-| `앱 계정` | 1001 | ❌ | 코드·venv·`.env` 소유. 앱이 이 권한으로 돕니다 |
-| `관리 계정` | 1000 | ✅ | 시스템 변경 담당 (apt·systemd·Caddy) |
+| 역할 | sudo | 하는 일 |
+|---|---|---|
+| **앱 계정** (`$APP_USER`) | ❌ | 코드·venv·`.env` 소유. 앱이 이 권한으로 돕니다 |
+| **관리 계정** | ✅ | 시스템 변경 담당 (apt·systemd·Caddy) |
 
-**`관리 계정` 는 `<앱계정 홈>` 에 들어갈 수 없습니다.** 권한이 `drwxr-x---`
-(0750, `앱계정:앱계정`)이라 `cd` 조차 되지 않습니다. 그래서 이런 명령은
-**실패합니다**:
+> 한 계정이 둘 다 하는 서버라면 이 구분은 무시하고 전부 그 계정에서 하면
+> 됩니다. 아래 "관리 계정 세션에서"는 그냥 `sudo` 로 읽으십시오.
+
+**앱 계정 홈이 0750 이면 관리 계정은 그 안에 들어갈 수 없습니다.**
+`drwxr-x---` 라 `cd` 조차 되지 않습니다. 그래서 이런 명령이 **실패합니다**:
 
 ```bash
 # 관리 계정 세션에서 — Permission denied
@@ -40,12 +58,12 @@ sudo tee -a /etc/caddy/Caddyfile < $PROJECT_DIR/deploy/Caddyfile.ecobotapt
 ```
 
 `sudo` 를 붙였는데도 실패하는 이유는, **리다이렉트(`<`)를 sudo 가 아니라
-셸이 수행**하기 때문입니다. 파일을 여는 주체는 여전히 `관리 계정` 입니다.
+셸이 수행**하기 때문입니다. 파일을 여는 주체는 여전히 관리 계정입니다.
 `sudo cp` 처럼 **명령 자체가 root 로 도는** 형태만 통합니다.
 
 ### 그래서 이렇게 나눕니다
 
-**`관리 계정` 세션에서** (실행 위치 무관 — 전부 절대 경로입니다):
+**관리 계정 세션에서** (실행 위치 무관 — 전부 절대 경로입니다):
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh deps
@@ -57,22 +75,22 @@ sudo bash $PROJECT_DIR/deploy/install-system.sh caddy
 안전**하고(중복 추가하지 않습니다), `caddy` 단계는 DNS 를 먼저 확인하고
 설정이 유효하지 않으면 백업본으로 되돌립니다.
 
-**`앱 계정` 세션에서** (sudo 불필요): 나머지 전부 — git, venv, pip,
+**앱 계정 세션에서** (sudo 불필요): 나머지 전부 — git, venv, pip,
 `.env` 작성, `migrate`, `collectstatic`, `seed_*`.
 
-> `su - 관리 계정` 로 전환하든 별도로 SSH 접속하든 상관없습니다.
+> `su - <관리계정>` 으로 전환하든 별도로 SSH 접속하든 상관없습니다.
 > 홈 디렉터리 위치도 무관합니다.
 
 ### 순서
 
 ```
-앱 계정      : git checkout, venv 생성, .env 작성
-관리 계정   : install-system.sh deps      ← apt
-앱 계정      : pip install (mysqlclient 포함)
-관리 계정   : install-system.sh db        ← MySQL DB·계정
-앱 계정      : migrate, collectstatic, createsuperuser, seed_*, rag_reindex
-관리 계정   : install-system.sh service   ← systemd
-관리 계정   : install-system.sh caddy     ← Caddy (DNS 확인 후)
+앱 계정   : git checkout, venv 생성, .env 작성
+관리 계정 : install-system.sh deps      ← apt
+앱 계정   : pip install (mysqlclient 포함)
+관리 계정 : install-system.sh db        ← MySQL DB·계정
+앱 계정   : migrate, collectstatic, createsuperuser, seed_*, rag_reindex
+관리 계정 : install-system.sh service   ← systemd
+관리 계정 : install-system.sh caddy     ← Caddy (DNS 확인 후)
 ```
 
 **`deps` 가 `pip install` 보다 먼저여야 합니다** — `mysqlclient` 가 그 헤더를
@@ -109,8 +127,8 @@ www.ecobotapt.com  → <서버 공인 IP>
 | A | `www` | `<서버 공인 IP>` | **DNS only (회색 구름)** |
 
 > ⚠️ **반드시 회색 구름으로.** 주황 구름(프록시)을 켜면 Caddy의 Let's Encrypt
-> HTTP-01 검증이 Cloudflare에 가로막혀 인증서 발급이 실패합니다. 기존
-> `기존-사이트.example.com`도 DNS only로 되어 있으니 동일하게 맞추십시오.
+> HTTP-01 검증이 Cloudflare에 가로막혀 인증서 발급이 실패합니다.
+> 같은 Caddy가 서빙하는 기존 도메인도 DNS only로 맞추십시오.
 
 전파 확인 — **아래가 IP를 뱉기 전에는 8단계(Caddy)로 넘어가지 마십시오.**
 
@@ -129,7 +147,7 @@ dig +short www.ecobotapt.com  # → <서버 공인 IP>
 
 ---
 
-## 1. 시스템 패키지  — `관리 계정` 세션
+## 1. 시스템 패키지  — 관리 계정 세션
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh deps
@@ -242,14 +260,14 @@ DJANGO_HSTS_SECONDS=0         # HTTPS 확인 후 31536000으로
 
 ---
 
-## 4. 데이터베이스  — `관리 계정` 세션
+## 4. 데이터베이스  — 관리 계정 세션
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh db
 ```
 
 MySQL 은 이미 이 서버에서 돌고 있지만, **root 가 `auth_socket` 방식이라 OS
-root 로만 접속됩니다.** `앱 계정` 로는 `mysql -u root` 가 이렇게 거부됩니다:
+root 로만 접속됩니다.** 앱 계정으로는 `mysql -u root` 가 이렇게 거부됩니다:
 
 ```
 ERROR 1698 (28000): Access denied for user 'root'@'localhost'
@@ -269,9 +287,9 @@ FLUSH PRIVILEGES;
 ```
 
 > ⚠️ **MySQL이 현재 `*:3306`으로 모든 인터페이스에 열려 있습니다.**
-> 공유기가 3306을 포워딩하지 않으면 인터넷에서는 안 닿지만, LAN의 다른
+> 앞단 라우터가 3306을 포워딩하지 않으면 인터넷에서는 안 닿지만, LAN의 다른
 > 기기에서는 접속 가능합니다. 이참에 조이는 것을 권합니다:
-> **`관리 계정` 세션에서** `/etc/mysql/mysql.conf.d/mysqld.cnf` 에
+> **관리 계정 세션에서** `/etc/mysql/mysql.conf.d/mysqld.cnf` 에
 > `bind-address = 127.0.0.1` 을 넣고 `sudo systemctl restart mysql`.
 > (Django 는 `DB_HOST=127.0.0.1` 이라 영향 없음)
 
@@ -303,7 +321,7 @@ cd $PROJECT_DIR
 
 ---
 
-## 6. gunicorn (systemd)  — `관리 계정` 세션
+## 6. gunicorn (systemd)  — 관리 계정 세션
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh service
@@ -312,8 +330,13 @@ sudo bash $PROJECT_DIR/deploy/install-system.sh service
 유닛 설치 → `media/`·`vector_db/` 준비 → `enable --now` 까지 합니다.
 venv 나 `.env` 가 없으면 기동하지 않고 멈춥니다.
 
-유닛은 `User=앱 계정` 로 돌고 경로가 전부 절대 경로이므로, **누가 설치하든
-서비스는 `앱 계정` 권한으로 실행됩니다.** 파일 소유권을 바꿀 필요가 없습니다.
+유닛은 `User=$APP_USER` 로 돌고 경로가 전부 절대 경로이므로, **누가 설치하든
+서비스는 앱 계정 권한으로 실행됩니다.** 파일 소유권을 바꿀 필요가 없습니다.
+
+> 저장소의 `deploy/*.service` 는 **템플릿(`.in`)** 입니다. systemd 가
+> `User=` · `WorkingDirectory=` 에 변수 확장을 지원하지 않아, `install-system.sh`
+> 가 설치 시점에 `@PROJECT_DIR@` · `@APP_USER@` 를 채워 넣습니다.
+> **`cp` 로 직접 설치하면 동작하지 않습니다.**
 
 ```bash
 systemctl status ecobot
@@ -344,7 +367,7 @@ Caddy에 붙이면 원인 지점이 두 배로 늘어납니다.
 
 ---
 
-## 8. Caddy  — `관리 계정` 세션
+## 8. Caddy  — 관리 계정 세션
 
 **0-1의 DNS 전파가 끝난 것을 확인한 뒤에** 진행하십시오.
 
@@ -357,7 +380,7 @@ sudo bash $PROJECT_DIR/deploy/install-system.sh caddy
 `systemctl reload caddy`.
 
 > ⚠️ `sudo tee -a ... < deploy/...` 형태는 쓰지 마십시오. 리다이렉트를 셸이
-> 수행해서 `관리 계정` 권한으로 읽으려다 Permission denied 가 납니다.
+> 수행해서 관리 계정 권한으로 읽으려다 Permission denied 가 납니다.
 > (위 **계정 구조** 절 참고)
 
 인증서는 첫 요청 때 Caddy가 Let's Encrypt에서 자동 발급합니다.
@@ -389,7 +412,7 @@ curl -sI https://www.ecobotapt.com | head -3      # → 301 → ecobotapt.com
 - [ ] **로그인이 됨** — 여기서 403이 나면 CSRF 설정 문제입니다
 - [ ] 챗봇 질문에 답변이 옴 (OpenAI 키)
 - [ ] 프로필 사진 업로드 후 화면에 보임 (media 서빙)
-- [ ] 기존 https://기존-사이트.example.com 이 그대로 동작
+- [ ] 같은 Caddy의 기존 사이트가 그대로 동작
 
 전부 통과했으면 HSTS를 켜십시오 — `.env`에 `DJANGO_HSTS_SECONDS=31536000`
 후 `sudo systemctl reload ecobot`.
@@ -453,9 +476,9 @@ tar czf ~/backup/media-$(date +%F).tar.gz media/
 
 ### 알아둘 것: 동적 IP
 
-집 회선이라 공인 IP가 바뀌면 **`ecobotapt.com`과 `기존-사이트.example.com`이 함께
-죽습니다.** Cloudflare API 토큰으로 DDNS 스크립트를 걸어두면 IP 변경 시 A
-레코드가 자동으로 따라갑니다. 도메인이 둘로 늘었으니 영향 범위도 늘었습니다.
+동적 IP 회선이라 공인 IP가 바뀌면 **이 서버의 도메인이 전부 함께 죽습니다.**
+Cloudflare API 토큰으로 DDNS 스크립트를 걸어두면 IP 변경 시 A 레코드가
+자동으로 따라갑니다. 같은 회선에 도메인이 많을수록 영향 범위도 넓습니다.
 
 ---
 
@@ -463,14 +486,14 @@ tar czf ~/backup/media-$(date +%F).tar.gz media/
 
 배포가 끝난 뒤에 붙이는 것들입니다. 순서는 상관없습니다.
 
-### 11-1. MySQL 을 로컬로 제한  — `관리 계정` 세션
+### 11-1. MySQL 을 로컬로 제한  — 관리 계정 세션
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh mysql-secure
 ```
 
 Ubuntu 기본 설정은 `/etc/mysql/mysql.conf.d/mysqld.cnf` 의 `bind-address` 가
-**주석 처리돼 있어** MySQL 이 모든 인터페이스(`*:3306`)로 열립니다. 공유기가
+**주석 처리돼 있어** MySQL 이 모든 인터페이스(`*:3306`)로 열립니다. 앞단 라우터가
 3306 을 포워딩하지 않으면 인터넷에서는 안 닿지만, **LAN 의 다른 기기에서는
 접속할 수 있습니다.**
 
@@ -489,9 +512,8 @@ Ubuntu 기본 설정은 `/etc/mysql/mysql.conf.d/mysqld.cnf` 의 `bind-address` 
 
 ### 11-2. Cloudflare DDNS  — 공인 IP 변경 추적
 
-**이 서버는 가정 회선이라 공인 IP 가 고정이 아닙니다.** IP 가 바뀌면 A 레코드가
-옛 주소를 가리킨 채 남고, **`ecobotapt.com` 과 `기존-사이트.example.com` 이 함께
-죽습니다.** 도메인이 둘로 늘면서 영향 범위도 늘었습니다.
+**이 서버는 동적 IP 회선이라 공인 IP 가 고정이 아닙니다.** IP 가 바뀌면 A
+레코드가 옛 주소를 가리킨 채 남고, **이 회선의 도메인이 전부 함께 죽습니다.**
 
 **① 토큰 만들기** (사람이 해야 합니다)
 
@@ -502,12 +524,12 @@ Cloudflare 대시보드 → 프로필 → **API Tokens** → Create Token
 |---|---|
 | Permissions | Zone / DNS / **Edit** |
 | Zone Resources | Include / Specific zone / `ecobotapt.com` |
-| Zone Resources (추가) | Include / Specific zone / `example.com` |
+| Zone Resources (추가) | 같은 회선의 다른 도메인이 있으면 그 zone 도 |
 
-**두 zone 을 모두 넣어야 위키까지 따라갑니다.** 하나만 넣으면 그 도메인만
-갱신되고 나머지는 조용히 실패합니다.
+**갱신할 zone 을 모두 넣어야 합니다.** 하나만 넣으면 그 도메인만 갱신되고
+나머지는 조용히 실패합니다.
 
-**② 설치** — `관리 계정` 세션
+**② 설치** — 관리 계정 세션
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh ddns
@@ -542,7 +564,7 @@ systemctl list-timers ddns-cloudflare     # 다음 실행 시각
 **남는 한계:** IP 가 바뀐 뒤 최대 5 분 + DNS TTL(자동 = 300 초)만큼은 옛 주소를
 가리킵니다. 주기를 줄여도 TTL 이 하한이라 실익이 적습니다.
 
-### 11-3. 재색인 워커 (백그라운드 색인)  — `관리 계정` 세션
+### 11-3. 재색인 워커 (백그라운드 색인)  — 관리 계정 세션
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh reindex
@@ -590,7 +612,7 @@ systemctl list-timers ecobot-reindex     # 다음 안전망 실행
 curl -s https://ecobotapt.com/rag/status/ | jq   # 진행 상태 (로그인 필요)
 ```
 
-> ⚠️ 이 기능은 마이그레이션이 필요합니다. `앱 계정` 계정에서:
+> ⚠️ 이 기능은 마이그레이션이 필요합니다. 앱 계정에서:
 > `cd $PROJECT_DIR && .venv/bin/python manage.py migrate`
 
 ### 11-4. 챗봇 하루 한도
@@ -645,7 +667,7 @@ cd $PROJECT_DIR
 입니다. 업로드는 "파일을 먼저 쓰고 → 레코드를 저장"하는 순서라, 그 사이에
 명령이 돌면 방금 올라온 파일이 고아로 보입니다.
 
-**주간 자동 정리 (선택)** — `관리 계정` 세션:
+**주간 자동 정리 (선택)** — 관리 계정 세션:
 
 ```bash
 sudo bash $PROJECT_DIR/deploy/install-system.sh cleanup
@@ -683,7 +705,7 @@ sudo bash $PROJECT_DIR/deploy/install-system.sh cleanup
 | 챗봇이 **503** 을 반환 | 임베딩 API 실패(지출 한도·키) | `journalctl -u ecobot` 에 원인이 남습니다 |
 | `media/` 용량이 계속 증가 | 고아 파일 누적 | `cleanup_orphan_files` (11-5) |
 
-### 롤백  — `관리 계정` 세션
+### 롤백  — 관리 계정 세션
 
 `install-system.sh caddy` 는 실행할 때마다 타임스탬프 백업을 남깁니다.
 

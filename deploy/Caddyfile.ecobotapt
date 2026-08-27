@@ -1,13 +1,13 @@
 # ── EcoBot (ecobotapt.com) ──
 # /etc/caddy/Caddyfile 의 **맨 끝에 그대로 이어붙이십시오**.
-# 기존 기존-사이트.example.com 블록은 건드리지 않습니다.
+# 기존 사이트 블록은 건드리지 않습니다.
 #
 # 적용:
 #   sudo caddy validate --config /etc/caddy/Caddyfile
-#   sudo systemctl reload caddy      # 무중단 — 위키는 끊기지 않습니다
+#   sudo systemctl reload caddy      # 무중단 — 기존 사이트는 끊기지 않습니다
 #
 # ⚠️ 반드시 DNS A 레코드가 먼저 퍼진 뒤에 reload 하십시오.
-#    dig +short ecobotapt.com  →  <서버 공인 IP> 이 나와야 합니다.
+#    dig +short ecobotapt.com  →  이 서버의 공인 IP 가 나와야 합니다.
 #    DNS 가 없는 상태로 reload 하면 Let's Encrypt 검증이 실패하고,
 #    실패를 반복하면 발급 한도에 걸려 몇 시간 막힙니다.
 
@@ -21,7 +21,7 @@ ecobotapt.com {
 	reverse_proxy 127.0.0.1:8000 {
 		# Caddy 기본 동작은 클라이언트가 보낸 X-Forwarded-For **뒤에 덧붙이는**
 		# 것이라, 그대로 두면 위조값이 앞에 오게 됩니다. 실제 주소로 덮어씁니다.
-		# (위키 블록과 같은 이유 — 그쪽 주석 참고)
+		# (같은 Caddyfile 의 다른 사이트 블록과 같은 이유)
 		#
 		# ⚠️ `caddy validate` 가 "Unnecessary header_up X-Forwarded-For" 라고
 		#    경고하는데, 무시해도 되는 경고입니다. Caddy 는 "어차피 헤더를
@@ -54,7 +54,7 @@ ecobotapt.com {
 # 지금은 Django 가 내보냅니다(config/urls.py). 더 빠르게 하려면:
 #
 #   1. sudo mkdir -p /var/www/ecobot/media
-#      sudo chown 앱 계정:www-data /var/www/ecobot/media && sudo chmod 750 ...
+#      sudo chown <앱계정>:www-data /var/www/ecobot/media && sudo chmod 750 ...
 #      (caddy 사용자는 www-data 그룹에 속해 있습니다)
 #   2. .env 에  DJANGO_MEDIA_ROOT=/var/www/ecobot/media
 #               DJANGO_SERVE_MEDIA=False
@@ -65,5 +65,5 @@ ecobotapt.com {
 #        	file_server
 #        }
 #
-# 홈 디렉터리(<앱계정 홈>, 0750)는 caddy 사용자가 통과하지 못하므로
+# 앱 계정 홈이 0750 이면 caddy 사용자가 통과하지 못하므로
 # media 를 프로젝트 안에 둔 채로는 이 방법을 쓸 수 없습니다.
