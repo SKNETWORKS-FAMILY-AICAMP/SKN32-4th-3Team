@@ -255,6 +255,36 @@ DOCS_DIR = BASE_DIR / "data" / "docs"
 # 재현 가능한 상태를 기본으로 둡니다. LangChain 경로로 바꿀 때는
 # manage.py measure_threshold 로 임계값을 재확인하십시오.
 RAG_PIPELINE = os.getenv("RAG_PIPELINE", "legacy")
+# RAG_PIPELINE 선택지
+#   legacy    : dense(FAISS) 단독 — 3차부터의 기본 경로
+#   langchain : LangChain FAISS 래퍼
+#   bm25      : BM25(sparse) 단독
+#   hybrid    : dense + BM25 를 RRF 로 융합
+#
+# ⚠️ bm25/hybrid 로 바꾸면 반드시 재색인해야 합니다 (bm25.pkl 생성).
+#     python manage.py seed_docs --reindex
+
+# RRF 상수. 클수록 상위 순위의 영향이 완만해진다.
+# 60 은 원논문 기본값(랭커가 여러 개인 대규모 코퍼스 기준)이며,
+# 랭커 2개·청크 900개 규모에서는 10~30 이 더 날카로울 수 있다.
+# 재색인 없이 바꿔 실험할 수 있으므로 스윕해 볼 것.
+RAG_RRF_K = _env_int("RAG_RRF_K", 60)
+
+# BM25 스케일 임계값. RAG_MIN_SCORE(코사인 0~1)와 스케일이 다르므로
+# 별도 값이 필요하다. 0.0 은 무필터이며, 실제 값은
+# manage.py measure_threshold 로 측정해서 정할 것.
+RAG_MIN_SCORE_BM25 = _env_float("RAG_MIN_SCORE_BM25", 0.0)
+
+# BM25 파라미터. b 는 문서 길이 정규화 강도(0~1).
+# 이 코퍼스는 법령 조문(길다)과 품목 블록(짧다)이 섞여 길이 편차가 크므로
+# 0.4~0.9 를 훑어볼 가치가 있다. 바꾸면 재색인 필요.
+RAG_BM25_K1 = _env_float("RAG_BM25_K1", 1.5)
+RAG_BM25_B = _env_float("RAG_BM25_B", 0.75)
+
+# 토큰 단가 (USD / 1M tokens). rag/usage.py 의 기본 표를 덮어쓴다.
+# 공식 가격이 바뀌면 여기서만 고치면 된다.
+# 표에 없는 모델은 토큰만 세고 비용은 None 으로 나온다(0 으로 채우지 않음).
+USAGE_PRICING: dict[str, dict[str, float]] = {}
 
 # 질문 클러스터링 임계값. 이 값 이상이면 기존 클러스터에 편입합니다.
 # (3차 routers/rag.py 의 SIMILARITY_THRESHOLD 상수를 설정으로 승격)
