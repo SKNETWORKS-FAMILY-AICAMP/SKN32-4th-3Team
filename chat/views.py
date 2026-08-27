@@ -108,6 +108,23 @@ class ChatAskView(LoginRequiredMixin, View):
         if not question:
             return _json({"detail": "question 이 필요합니다."}, status=400)
 
+        # ── 0. 하루 한도 ──
+        # 어떤 작업보다 먼저 봅니다. 대화방을 만들거나 질문을 저장한 뒤에
+        # 막으면, 답변 없는 질문만 기록에 남아 사용자가 혼란스러워집니다.
+        from . import ratelimit
+
+        quota = ratelimit.get_quota(request.user)
+        if quota.exceeded:
+            return _json(
+                {
+                    "detail": ratelimit.limit_message(quota),
+                    "limit": quota.limit,
+                    "used": quota.used,
+                    "remaining": 0,
+                },
+                status=429,
+            )
+
         region = body.get("region") or request.user.region
         if region not in _VALID_REGIONS:
             region = "seoul"
@@ -163,6 +180,36 @@ class ChatAskView(LoginRequiredMixin, View):
             apartment_id=apartment_id,
         )
 
+        # ── 4-1. 검색 자체가 불가능했던 경우 ──
+        # API 지출 한도 소진·키 만료 등으로 임베딩 호출이 실패한 상황이다.
+        # 이건 "자료를 못 찾은" 것이 아니라 "찾아보지도 못한" 것이라,
+        #   · ChatLog 를 남기면 '자료없음 대응률' 지표가 오염되고
+        #   · 하루 한도(ChatLog 기준)를 차감하면 답을 못 받은 사용자에게
+        #     횟수만 깎이는 셈이 된다
+        # 그래서 통계에서 빼고 503 으로 알린다. 대화 기록에는 남겨서
+        # 사용자가 자기 질문이 사라진 것처럼 느끼지 않게 한다.
+        if result.get("error"):
+            ChatMessage.objects.create(
+                session=session,
+                role=ChatMessage.Role.ASSISTANT,
+                content=result.get("answer", ""),
+            )
+            session.save(update_fields=["updated_at"])
+            return _json(
+                {
+                    "session_id": str(session.pk),
+                    "answer": result.get("answer", ""),
+                    "detail": result.get("answer", ""),
+                    "error": result["error"],
+                    "tip": "",
+                    "source": "",
+                    "sources": [],
+                    "suggested_questions": [],
+                    "law_notice": "",
+                },
+                status=503,
+            )
+
         # ── 5. 통계 로그 + 클러스터 ──
         log = ChatLog.objects.create(
             user=request.user,
@@ -202,6 +249,11 @@ class ChatAskView(LoginRequiredMixin, View):
                 "suggested_questions": result.get("suggested_questions", []),
                 "law_notice": result.get("law_notice", ""),
                 "contact_cards": result.get("contact_cards", []),
+                # 방금 1건을 썼으므로 남은 횟수는 하나 줄어듭니다.
+                # 무제한이면 null 이라 프런트가 그대로 무시하면 됩니다.
+                "remaining": (
+                    None if quota.unlimited else max(0, quota.limit - quota.used - 1)
+                ),
             }
         )
 

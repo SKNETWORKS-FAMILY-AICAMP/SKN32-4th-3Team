@@ -36,9 +36,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import logging
+
 from django.conf import settings
 
 from . import bm25_store, chunking, embeddings, scoring, vector_store
+
+logger = logging.getLogger(__name__)
 
 # 소유자와 무관하게 전체 공개되는 문서 유형 (수집한 공공자료)
 # 버그 수정(2R-2): "apartment" 가 빠져 있어서 owner_id 필터가 단지 규정을
@@ -502,6 +506,11 @@ def search(
     #    무력화된다. 둘 다 에러 없이 조용히 일어난다.
     results = scoring.filter_by_threshold(results, min_score, settings.RAG_PIPELINE)
 
+    # 재색인이 백그라운드로 바뀌면서 필요해진 장치.
+    # 문서를 지워도 다음 재색인 전까지는 청크가 인덱스에 남는다.
+    # 임계값 통과 뒤(=결과가 가장 적을 때) 거른다.
+    results = _drop_missing_documents(results)
+
     # 4차 추가분: 법령 문서에 시행일 정보를 붙인다 (점수/정렬에는 영향 없음).
     results = _annotate_law_status(results)
     # 4차 2R 추가분: 단지 규정에 출처 등급·확인수·등록시점을 붙인다.
@@ -511,6 +520,72 @@ def search(
         return _apply_quota(results, region)
 
     return results[:top_k]
+
+
+def _retrieval_error_message(exc: Exception) -> str:
+    """검색 실패 원인을 사용자에게 보여줄 한 문장으로 바꾼다.
+
+    분류 기준은 rag/llm.py 의 _generate_openai() 와 같게 맞춘다 — 같은
+    API 의 같은 오류를 두 곳이 다르게 부르면 로그를 읽을 때 헷갈린다.
+
+    **원인 자체는 사용자에게 알리지 않는다.** "API 키가 잘못됐습니다" 같은
+    문구는 사용자가 할 수 있는 일이 없는데 서비스 내부 사정만 노출한다.
+    진짜 원인은 로그로 간다(journalctl -u ecobot).
+    """
+    msg = str(exc).lower()
+
+    if "insufficient_quota" in msg or "quota" in msg or "429" in msg or "rate limit" in msg:
+        # 지출 한도 소진이 여기로 온다. 관리자가 한도를 올리면 풀리므로
+        # "잠시 후"가 맞는 안내다.
+        return "현재 API 사용량이 초과되었습니다. 잠시 후 다시 질문해 주세요."
+
+    if "api key" in msg or "401" in msg or "authentication" in msg or "invalid_api_key" in msg:
+        # 키 문제는 저절로 풀리지 않는다. 기다리라고 하면 안 된다.
+        return "검색 기능에 문제가 있어 답변할 수 없습니다. 관리자에게 문의해 주세요."
+
+    return "일시적인 오류로 답변할 수 없습니다. 잠시 후 다시 시도해 주세요."
+
+
+def _drop_missing_documents(results: list[dict]) -> list[dict]:
+    """DB 에 없거나 승인 상태가 아닌 문서의 청크를 결과에서 제거한다.
+
+    **왜 필요한가**
+
+    문서 삭제가 예전에는 그 요청 안에서 rebuild_index() 까지 끝냈다. 지금은
+    재색인이 백그라운드라, 삭제 직후부터 재색인이 끝나기 전까지는 지운
+    문서의 청크가 인덱스에 그대로 남아 있다. 그 사이의 질문이 삭제된 문서를
+    근거로 인용하면, 3차 트러블슈팅 4번("삭제한 파일의 옛 레코드가 잘못
+    인용됨")이 그대로 재현된다.
+
+    승인 취소(status != APPROVED)도 같이 막는다. 색인 대상이 애초에
+    APPROVED 뿐이므로(_iter_documents), 기준을 맞춰 두는 편이 일관적이다.
+
+    document_id 가 없는 청크(RAG_SOURCE=files 로 만든 인덱스)는 대조할
+    대상이 없으므로 그대로 통과시킨다 — 여기서 막으면 파일 기반 인덱스가
+    통째로 비어 버린다.
+    """
+    from .models import Document
+
+    ids = {
+        r["document_id"] for r in results
+        if r.get("document_id") is not None
+    }
+    if not ids:
+        return results
+
+    alive = set(
+        Document.objects.filter(
+            pk__in=ids, status=Document.Status.APPROVED
+        ).values_list("pk", flat=True)
+    )
+    # 전부 살아 있으면(대부분의 경우) 리스트를 새로 만들지 않는다.
+    if len(alive) == len(ids):
+        return results
+
+    return [
+        r for r in results
+        if r.get("document_id") is None or r["document_id"] in alive
+    ]
 
 
 def _annotate_law_status(results: list[dict]) -> list[dict]:
@@ -669,7 +744,31 @@ def ask(
     않고 매번 오늘 날짜와 비교), 다음 질문부터는 자동으로 근거에
     포함된다 — 별도 배치 작업이 필요 없다.
     """
-    results = search(question, top_k, owner_id, region=region, balanced=True, apartment_id=apartment_id)
+    # 검색은 임베딩 API 호출을 포함한다. 지출 한도가 소진되거나 키가
+    # 만료되면 여기서 예외가 올라오는데, 그대로 두면 사용자에게 500 이
+    # 나간다. 답변 생성(LLM) 쪽은 이미 폴백이 있으므로(rag/llm.py) 이쪽만
+    # 비어 있던 셈이다.
+    #
+    # search() 자체는 그대로 예외를 올린다 — 관리자 진단 화면
+    # (RagSearchView)에서는 원인이 그대로 보여야 한다.
+    try:
+        results = search(question, top_k, owner_id, region=region, balanced=True, apartment_id=apartment_id)
+    except Exception as exc:
+        logger.exception("검색 실패 — 질문=%r", question[:80])
+        return {
+            # 호출자가 통계·기록에서 제외할 수 있도록 표시한다.
+            # 이건 "자료를 못 찾은" 것이 아니라 "찾아보지도 못한" 것이라,
+            # '자료없음 대응률' 지표에 섞이면 수치가 오염된다.
+            "error": "retrieval_unavailable",
+            "answer": _retrieval_error_message(exc),
+            "law": "",
+            "tip": "",
+            "source": "",
+            "sources": [],
+            "contexts": [],
+            "suggested_questions": [],
+            "law_notice": "",
+        }
 
     grounding = [r for r in results if r.get("law_is_current") is not False]
     law_notice = _law_notice(results)

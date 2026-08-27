@@ -1,0 +1,39 @@
+# 고아 업로드 파일 정리 (주 1회, oneshot).
+#
+# maintenance/file_cleanup.py 의 시그널이 앞으로 생길 고아를 막으므로
+# 평소에는 지울 것이 없습니다. 이건 시그널이 놓친 경우를 회수하는
+# 안전망입니다 — 직접 SQL 로 레코드를 지웠거나, 파일 삭제가 실패했거나,
+# 이 기능이 없던 시절에 쌓인 것.
+#
+# --min-age-hours 168 (7일): 업로드는 "파일을 먼저 쓰고 → 레코드 저장"
+# 순서라 그 사이에 돌면 방금 올라온 파일이 고아로 보입니다. 자동 삭제라
+# 수동 실행(기본 24시간)보다 훨씬 보수적으로 잡습니다.
+#
+# ⚠️ 이 유닛은 파일을 **되돌릴 수 없게** 지웁니다. 무엇이 지워지는지
+#    먼저 보려면 앱 계정에서 (삭제 없이):
+#      .venv/bin/python manage.py cleanup_orphan_files
+#
+# 로그:  journalctl -u ecobot-cleanup
+
+[Unit]
+Description=EcoBot 고아 업로드 파일 정리
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@APP_USER@
+Group=@APP_USER@
+WorkingDirectory=@PROJECT_DIR@
+
+ExecStart=@PROJECT_DIR@/.venv/bin/python \
+    @PROJECT_DIR@/manage.py cleanup_orphan_files \
+    --delete --min-age-hours 168
+
+TimeoutStartSec=600
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=@PROJECT_DIR@/media

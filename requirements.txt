@@ -3,11 +3,13 @@ Django>=5.0,<6.0
 python-dotenv
 mysqlclient
 Pillow
+whitenoise
 
 # --- RAG pipeline (kept from 3rd round) ---
 faiss-cpu
 numpy
 pypdf
+rank_bm25
 
 # --- LLM / embeddings ---
 google-genai

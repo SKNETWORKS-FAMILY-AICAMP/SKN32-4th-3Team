@@ -1,0 +1,20 @@
+# 5분마다 공인 IP 를 확인합니다.
+#
+# 가정 회선의 IP 변경은 예고 없이 일어나므로, 최악의 경우 최대 5분간
+# 두 도메인이 옛 주소를 가리킵니다. 더 촘촘히 돌려도 되지만 Cloudflare API
+# 호출만 늘고 실익이 적습니다 — DNS TTL(자동=300초) 자체가 하한입니다.
+
+[Unit]
+Description=Cloudflare DDNS 5분 주기 확인
+Requires=ddns-cloudflare.service
+
+[Timer]
+# 부팅 직후 한 번 (IP 는 재부팅·회선 재접속 때 가장 잘 바뀝니다)
+OnBootSec=1min
+OnUnitActiveSec=5min
+# 여러 타이머가 같은 순간에 몰리는 것을 흩뜨립니다.
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

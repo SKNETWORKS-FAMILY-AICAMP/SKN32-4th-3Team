@@ -48,6 +48,31 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# ── 리버스 프록시(Caddy) 뒤에서 동작할 때 ──
+# Caddy 는 X-Forwarded-Proto 를 자동으로 붙입니다(nginx 와 달리 별도 설정이
+# 필요 없습니다). 이 헤더를 신뢰하도록 알려주지 않으면 Django 는 모든 요청을
+# 평문 http 로 보고, 그 결과 secure 쿠키가 붙지 않고 CSRF 검사가 http:// origin
+# 을 기대해 로그인 · 글쓰기가 전부 403 이 됩니다.
+#
+# ⚠️ 이 값은 앞단 프록시가 반드시 존재할 때만 켜십시오. 프록시 없이 켜면
+#    클라이언트가 보낸 X-Forwarded-Proto 를 그대로 믿게 되어 위조가 가능합니다.
+if _env_bool("DJANGO_BEHIND_PROXY", "False"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# ── CSRF 신뢰 origin ──
+# Django 4+ 는 스킴까지 포함한 정확한 값을 요구합니다(host 만으로는 안 됩니다).
+# 명시하지 않으면 ALLOWED_HOSTS 의 실제 도메인에서 https:// 형태로 유도합니다.
+# 도메인을 추가할 때 두 곳을 고치다 한 곳을 빠뜨리는 사고를 막기 위함입니다.
+_csrf_origins = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").strip()
+if _csrf_origins:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        f"https://{host}"
+        for host in ALLOWED_HOSTS
+        if host not in ("127.0.0.1", "localhost", "testserver", "*")
+    ]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -70,10 +95,21 @@ INSTALLED_APPS = [
     # 가리키므로(apartments.Apartment) migrate 순서상 rag/chat 보다 먼저
     # 와야 한다.
     "apartments",
+    # 모델 없는 유지보수 앱. 업로드 파일의 수명을 DB 레코드에 맞추는
+    # 시그널을 붙입니다(고아 파일 방지). 마이그레이션이 없습니다.
+    "maintenance",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # 정적 파일 서빙. DEBUG=False 면 Django 는 static 을 내보내지 않으므로
+    # 이게 없으면 배포 직후 CSS · JS 가 전부 404 가 됩니다.
+    #
+    # 앞단 Caddy 가 직접 서빙하는 편이 더 빠르지만, Caddy 는 caddy 사용자로
+    # 돌고 앱 계정 홈(0750)을 통과하지 못합니다. 권한을 푸는
+    # 대신 WhiteNoise 를 씁니다 — 경로 결합이 없어 이전에도 그대로 동작합니다.
+    # (SecurityMiddleware 바로 다음이어야 합니다. 순서를 바꾸지 마십시오.)
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -165,9 +201,94 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# collectstatic 이 모아 넣을 자리. 이 값이 없으면 collectstatic 자체가
+# ImproperlyConfigured 로 실패합니다. 개발 중에는 쓰이지 않습니다.
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# 업로드 파일 저장 위치. 기본값은 개발과 동일하게 프로젝트 안입니다.
+# 운영에서 Caddy 가 /media/ 를 직접 서빙하게 하려면 홈 디렉터리 밖
+# (예: /var/www/ecobot/media)으로 옮기고 이 값을 .env 에서 덮어쓰십시오.
+MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", "") or (BASE_DIR / "media"))
+
+# WhiteNoise 압축 + 파일명 해싱. 해싱된 이름은 영구 캐시가 가능해집니다.
+# ⚠️ Manifest 방식은 템플릿의 {% static %} 이 가리키는 파일이 실제로
+#    없으면 500 을 냅니다. collectstatic 을 반드시 먼저 돌리십시오.
+if not DEBUG:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# ─────────────────────────── 운영 보안 ───────────────────────────
+# DEBUG=False 일 때만 켭니다. 개발 서버(http://127.0.0.1)에서 secure 쿠키를
+# 켜면 로그인이 되지 않으므로 분기가 필요합니다.
+
+if not DEBUG:
+    # 쿠키를 HTTPS 요청에만 실어 보냅니다.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # 자바스크립트에서 세션 쿠키를 읽지 못하게 합니다(XSS 피해 축소).
+    SESSION_COOKIE_HTTPONLY = True
+    # 외부 사이트에서 넘어온 POST 에는 쿠키를 붙이지 않습니다.
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+    # 브라우저의 MIME 스니핑을 막습니다(업로드 파일이 HTML 로 해석되는 것 방지).
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+
+    # HTTP→HTTPS 리다이렉트는 Caddy 가 이미 처리합니다. 여기서 또 켜면
+    # 프록시 헤더 설정이 어긋났을 때 무한 리다이렉트가 됩니다. 필요할 때만.
+    SECURE_SSL_REDIRECT = _env_bool("DJANGO_SSL_REDIRECT", "False")
+
+    # HSTS. 기본값 0(꺼짐)입니다.
+    # ⚠️ 되돌리기 어렵습니다 — 한번 내보내면 브라우저가 그 기간 동안
+    #    이 도메인을 HTTPS 로만 접속합니다. 인증서가 정상 동작하는 것을
+    #    확인한 뒤에 31536000(1년)으로 올리십시오.
+    SECURE_HSTS_SECONDS = _env_int("DJANGO_HSTS_SECONDS", 0)
+    if SECURE_HSTS_SECONDS:
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+
+
+# ─────────────────────────── 로깅 ───────────────────────────
+# Django 기본 로깅은 DEBUG=False 이면 예외를 ADMINS 에게 메일로만 보냅니다.
+# ADMINS 를 설정하지 않았으므로 그대로 두면 500 에러가 **아무 데도 안 남습니다**.
+# stdout 으로 내보내면 gunicorn → systemd → journald 로 흘러갑니다.
+#   확인:  journalctl -u ecobot -f
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+    },
+    "loggers": {
+        # 처리되지 않은 예외의 트레이스백이 여기로 옵니다.
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
 
 
 # ══════════════════════ RAG 설정 ══════════════════════
@@ -233,6 +354,11 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # (통과율 93.3% · 환각률 6.7% 수치가 FAISS + _apply_quota 로 측정된 값이라
 #  벡터스토어를 교체하면 evals/ 의 3차례 측정 이력이 무효가 됩니다)
 INDEX_DIR = BASE_DIR / "vector_db"
+# 재색인 트리거. 웹 요청이 이 파일을 touch 하면 systemd path 유닛이
+# ecobot-reindex.service 를 깨웁니다(rag/tasks.py 참고). INDEX_DIR 아래에
+# 두는 이유는 systemd 유닛의 ReadWritePaths 가 이미 이 디렉터리를 허용하기
+# 때문입니다 — 다른 곳에 두면 ProtectHome=read-only 에 막힙니다.
+REINDEX_TRIGGER_FILE = INDEX_DIR / "reindex.trigger"
 # 법령 원문 txt 폴더
 LAWS_DIR = BASE_DIR / "data" / "laws"
 # 지역별 · 공통 배출 가이드 폴더
@@ -299,3 +425,14 @@ QUESTION_SUGGEST_DEDUP_THRESHOLD = _env_float("QUESTION_SUGGEST_DEDUP_THRESHOLD"
 
 # 답변 생성 시 프롬프트에 넣을 최근 대화 턴 수
 CHAT_HISTORY_TURNS = _env_int("CHAT_HISTORY_TURNS", 3)
+
+# ── 사용자별 하루 질문 한도 ──
+# 회원가입이 열려 있고 질문 1건마다 임베딩 + LLM 호출이 나가므로, 이게 없으면
+# 계정 하나로 API 비용을 무제한 태울 수 있습니다. OpenAI 대시보드의 월 한도는
+# "터지기 직전에 서비스 전체를 멈추는" 차단기이고, 이쪽은 애초에 안 터지게
+# 하는 장치입니다. 0 으로 두면 제한하지 않습니다.
+CHAT_DAILY_LIMIT = _env_int("CHAT_DAILY_LIMIT", 50)
+
+# 서비스 운영자(superuser)는 한도에서 제외합니다. 문서 검수·품질 확인처럼
+# 질문을 많이 해야 하는 작업이 막히면 곤란합니다.
+CHAT_DAILY_LIMIT_EXEMPT_STAFF = _env_bool("CHAT_DAILY_LIMIT_EXEMPT_STAFF", "True")

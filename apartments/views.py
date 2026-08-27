@@ -513,15 +513,15 @@ class ApartmentRuleDeleteView(LoginRequiredMixin, View):
         if not permissions.can_manage_apartment(request.user, rule.apartment_id):
             raise Http404("접근 권한이 없습니다.")
 
-        # 연동 Document 제거 + 인덱스 재구축
+        # 연동 Document 제거 + 색인 예약
         if rule.document_id:
             from rag.models import Document
             Document.objects.filter(pk=rule.document_id).delete()
-            try:
-                from rag import service as rag_service
-                rag_service.rebuild_index()
-            except Exception:
-                pass
+            # request_reindex() 는 예외를 올리지 않으므로 try 로 감싸지 않는다.
+            # 지운 규정이 재색인 전까지 인용되는 것은 search() 쪽
+            # _drop_missing_documents() 가 막는다.
+            from rag import tasks as rag_tasks
+            rag_tasks.request_reindex(f"단지 규정 삭제: rule#{rule.pk}")
 
         rule.delete()
         messages.success(request, "규정이 삭제되었습니다.")

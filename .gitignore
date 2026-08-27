@@ -11,4 +11,9 @@ vector_db/*.faiss
 vector_db/chunks.json
 vector_db/embedding_cache.json
 vector_db/langchain/
+# 재색인 워커의 런타임 파일 (트리거·중복실행 방지 락)
+vector_db/reindex.trigger
+vector_db/reindex.lock
 
+# collectstatic 산출물 (배포 때마다 재생성)
+staticfiles/

@@ -1,0 +1,42 @@
+# 운영 배포용 의존성 (ecobotapt.com).
+#
+# requirements.txt 와의 차이는 두 가지입니다.
+#
+#  1. WSGI 서버(gunicorn)와 정적파일 서빙(whitenoise)이 추가됩니다.
+#     개발의 `runserver` 는 운영에서 쓰면 안 됩니다.
+#
+#  2. sentence-transformers 와 langchain-* 계열을 뺐습니다.
+#     sentence-transformers 는 torch 를 끌고 오는데 그것만 2~3GB 입니다.
+#     이 둘은 아래 조건에서만 쓰이고, 두 경우 모두 **함수 안에서 지연
+#     임포트**되므로(rag/embeddings.py:49, rag/service.py:153 등)
+#     패키지가 없어도 앱은 정상 기동합니다.
+#
+#       EMBEDDING_BACKEND=local   → sentence-transformers 필요
+#       RAG_PIPELINE=langchain    → langchain-* 필요
+#
+#     ⚠️ 운영 .env 에서 위 두 값을 바꾸려면 이 파일에 해당 패키지를 다시
+#        넣고 재설치해야 합니다. 그대로 두면 그 요청에서만
+#        ModuleNotFoundError 가 납니다(기동 시점에는 안 잡힙니다).
+#
+#     운영 기본값은 EMBEDDING_BACKEND=openai / RAG_PIPELINE=legacy 입니다.
+#     legacy 가 evals/ 의 통과율 93.3% 를 측정한 경로이기도 합니다.
+
+# --- web framework ---
+Django>=5.0,<6.0
+python-dotenv
+mysqlclient
+Pillow
+
+# --- WSGI 서버 · 정적파일 ---
+gunicorn
+whitenoise[brotli]
+
+# --- RAG pipeline ---
+faiss-cpu
+numpy
+pypdf
+rank_bm25
+
+# --- LLM / embeddings ---
+openai
+google-genai
