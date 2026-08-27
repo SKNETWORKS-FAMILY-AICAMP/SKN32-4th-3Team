@@ -98,40 +98,36 @@ SKN32-4th-3Team/
 
 ## 파이썬 버전 · 팀원 환경
 
-**3.10 ~ 3.13 어디서든 동작합니다.** 3.11과 3.12에서 실제로 색인·기동까지
-검증했습니다. 3.12 전용 문법은 쓰지 않았습니다.
+- **지원 범위**: 3.10 ~ 3.13 (3.11 · 3.12 에서 색인·기동까지 검증)
+- **3.9 이하 불가**: 코드가 `str | None` 문법 사용
+- **`.python-version`**: 3.12 고정 — uv · pyenv 가 없는 버전을 자동으로 받아 맞춤
+- **3.12 전용 문법 미사용**
 
-- **3.9 이하는 안 됩니다** — 이식된 코드가 `str | None` 문법을 씁니다.
-- `.python-version`은 3.12로 고정돼 있습니다. uv나 pyenv를 쓰면 팀원 환경에
-  3.12가 없어도 자동으로 받아 맞춰 주므로, 그대로 두는 편이 버전이 갈리지
-  않아 낫습니다.
+### `mysqlclient` 설치 실패 시
 
-### `mysqlclient` 설치가 실패한다면
-
-`mysqlclient`는 C 확장이고 PyPI에 **Windows 휠만** 올라와 있습니다(2.2.8 기준).
+C 확장이고 PyPI 에 **Windows 휠만** 제공 (2.2.8 기준).
+증상: `Exception: Can not find valid pkg-config name.`
 
 | 환경 | 필요한 것 |
 |---|---|
-| Windows | 없음 — 휠로 바로 설치됩니다 |
+| Windows | 없음 — 휠로 바로 설치 |
 | Linux | `sudo apt install default-libmysqlclient-dev` |
 | macOS | `brew install mysql-client pkg-config` |
 
-증상은 `Exception: Can not find valid pkg-config name.` 입니다.
-**개발 중이라면 `DB_ENGINE=sqlite3`을 쓰면 `mysqlclient` 자체가 필요 없습니다**
-(퀵스타트 경로). MySQL은 서버에서만 씁니다.
+→ **개발 중이면 `DB_ENGINE=sqlite3`** 으로 `mysqlclient` 자체를 회피 (퀵스타트 경로). MySQL 은 서버 전용.
 
-### uv 를 쓴다면
+### uv 사용 시
 
 ```bash
 uv venv --python 3.12 .venv
 uv pip install -r requirements.txt
 ```
 
-**두 줄 다 Windows·macOS·Linux 에서 그대로 동작합니다.** `uv pip install` 은
-현재 디렉터리의 `.venv` 를 자동으로 찾으므로 활성화도, 인터프리터 경로를
-적는 것도 필요 없습니다.
+- **Windows · macOS · Linux 공통** — `uv pip install` 이 현재 디렉터리의 `.venv` 를 자동 탐색 (활성화 · 인터프리터 경로 불필요)
+- **`python3.x-venv` 시스템 패키지 없이** venv 생성, 없는 파이썬 버전 자동 다운로드
+- **`mysqlclient` 빌드 의존성은 uv 로도 우회 불가**
 
-대상을 명시해야 한다면 경로가 OS 마다 다릅니다:
+대상을 명시할 경우 경로가 OS 별로 다름:
 
 ```bash
 # Windows
@@ -139,9 +135,6 @@ uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 # macOS/Linux
 uv pip install --python .venv/bin/python -r requirements.txt
 ```
-
-uv는 `python3.x-venv` 시스템 패키지 없이도 venv를 만들고, 없는 파이썬 버전은
-직접 내려받습니다. 다만 위 `mysqlclient` 빌드 의존성은 uv로도 우회되지 않습니다.
 
 ---
 
@@ -160,11 +153,10 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-> ⚠️ **Windows: 프로젝트를 영문 경로에 두십시오** (예: `C:\proj4`).
-> 경로에 한글이 섞이면 색인 단계에서
-> `Illegal byte sequence ... index.faiss for writing` 로 실패합니다 —
-> FAISS 가 C++ 에서 파일을 직접 열어 경로 인코딩을 넘기지 못하기 때문입니다.
-> 사용자명이 한글이면 바탕화면·다운로드 폴더도 해당합니다.
+> ⚠️ **Windows: 프로젝트를 영문 경로에** (예: `C:\proj4`)
+> 경로에 한글이 섞이면 색인 단계에서 `Illegal byte sequence ... index.faiss for writing` 실패 —
+> FAISS 가 C++ 에서 파일을 직접 열어 경로 인코딩 전달 불가.
+> 사용자명이 한글이면 바탕화면 · 다운로드 폴더도 해당.
 
 ### 2. 의존성 설치
 
@@ -205,14 +197,13 @@ OPENAI_API_KEY=sk-...
 LLM_BACKEND=openai
 ```
 
-> 실사용 설정은 **MySQL 에 DB 를 먼저 만들어야** 합니다. Django 는 DB 를
-> 대신 만들어 주지 않습니다:
+> **MySQL 은 DB 를 먼저 생성** — Django 가 대신 만들지 않음
 >
 > ```sql
 > CREATE DATABASE ecora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 > ```
 >
-> `mysqlclient` 설치가 실패하면 위 [파이썬 버전 · 팀원 환경](#파이썬-버전--팀원-환경) 을 보십시오.
+> `mysqlclient` 설치 실패 시 → [파이썬 버전 · 팀원 환경](#파이썬-버전--팀원-환경)
 
 ### 4. DB 초기화 및 실행
 
@@ -283,11 +274,11 @@ Internet → Caddy (:443, HTTPS) → Gunicorn (127.0.0.1:8000) → Django → My
 - **torch 제외**: 서버 메모리 절약 (sentence-transformers 미사용)
 - **Gunicorn timeout**: 180초 (RAG 답변 생성 대기)
 
-전체 절차·트러블슈팅은 **[docs/deploy.md](docs/deploy.md)** 를 보십시오.
+전체 절차 · 트러블슈팅 → **[docs/deploy.md](docs/deploy.md)**
 
 | 파일 | 용도 |
 |---|---|
-| `requirements-prod.txt` | 운영 의존성 (torch 계열 제외, gunicorn·whitenoise 추가) |
+| `requirements-prod.txt` | 운영 의존성 (torch 계열 제외, gunicorn · whitenoise 추가) |
 | `.env.production.example` | 운영 환경변수 예시 |
 | `deploy/gunicorn.conf.py` | WSGI 서버 설정 |
 | `deploy/ecobot.service.in` | systemd 유닛 **템플릿** (설치 시 경로·계정 치환) |
@@ -298,18 +289,18 @@ Internet → Caddy (:443, HTTPS) → Gunicorn (127.0.0.1:8000) → Django → My
 | `deploy/ecobot-cleanup.*` | 고아 업로드 파일 주간 정리 (선택) |
 | `docs/decisions/0001-*.md` | 구성 결정 배경과 대가 |
 
-배포 전 반드시 확인할 것:
+배포 전 확인:
 
-- 유닛은 `.in` 템플릿입니다 — `cp` 가 아니라 `install-system.sh` 로 설치하십시오
-- `collectstatic` 실행 — 빠뜨리면 **모든 페이지가 500** 입니다
-- `.env` 의 `DJANGO_DEBUG=False`, `DJANGO_BEHIND_PROXY=True`
-- OpenAI 대시보드에서 **월 사용 한도** 설정 (회원가입이 열려 있고 rate limit 이 없습니다)
+- **유닛은 `.in` 템플릿**: `cp` 가 아니라 `install-system.sh` 로 설치
+- **`collectstatic` 실행**: 누락 시 **모든 페이지 500**
+- **`.env`**: `DJANGO_DEBUG=False`, `DJANGO_BEHIND_PROXY=True`
+- **OpenAI 월 사용 한도 설정**: 회원가입이 열려 있고 rate limit 없음
 
 ---
 
 ## 참고
 
-- **hash 임베딩**은 파이프라인 검증용입니다. 동의어 검색이나 "자료없음" 판정 정확도가 필요하면 `EMBEDDING_BACKEND=openai`를 사용하세요.
-- **API 키 없이** 실행하면 챗봇이 검색·출처 조립까지만 동작하고 답변 문장은 "[LLM 미연결]" 안내로 대체됩니다.
-- 임베딩 백엔드를 변경하면 `RAG_MIN_SCORE` 재측정이 필요합니다.
-- `.env.example`에 전체 환경변수 목록과 설명이 있습니다.
+- **hash 임베딩**: 파이프라인 검증용 — 동의어 검색 · "자료없음" 판정 정확도가 필요하면 `EMBEDDING_BACKEND=openai`
+- **API 키 없이 실행**: 검색 · 출처 조립까지만 동작, 답변 문장은 "[LLM 미연결]" 안내로 대체
+- **임베딩 백엔드 변경 시**: `RAG_MIN_SCORE` 재측정 필요
+- **전체 환경변수 목록**: `.env.example`
