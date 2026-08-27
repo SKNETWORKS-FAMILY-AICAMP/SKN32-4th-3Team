@@ -299,10 +299,10 @@ class FeedbackStatsAPIView(AdminRequiredMixin, View):
 
         msgs = ChatMessage.objects.filter(role=ChatMessage.Role.ASSISTANT)
 
-        # 아파트별 필터 (쿼리 파라미터 ?apartment=<id>)
-        apt_id = request.GET.get("apartment")
-        if apt_id:
-            msgs = msgs.filter(session__apartment_id=apt_id)
+        # 지역별 필터 (쿼리 파라미터 ?region=<code>)
+        region_filter = request.GET.get("region")
+        if region_filter:
+            msgs = msgs.filter(session__region=region_filter)
 
         positive = msgs.filter(feedback="positive").count()
         negative = msgs.filter(feedback="negative").count()

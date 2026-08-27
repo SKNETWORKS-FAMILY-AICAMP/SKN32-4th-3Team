@@ -116,13 +116,13 @@ def _find_phone_in_apartment_rules(apartment_id: int) -> str:
 
 # 근거를 못 찾았을 때 카드 없이 보여줄 최소 안내 문구.
 # "관련 정보를 찾을 수 없습니다" 류의 막연한 문구는 절대 쓰지 않는다.
-FALLBACK_NOTICE = "문의하신 내용과 관련된 자료를 확인하지 못했습니다. 정확한 안내는 관리사무소로 문의해 주세요."
+FALLBACK_NOTICE = "문의하신 내용과 관련한 자료를 확인하지 못했습니다. 지자체 또는 아파트 관리사무소에 문의해주세요."
 
 # 카드(관리사무소·지자체)가 하나라도 있을 때 쓰는 안내 문구.
 # "정확한 안내는 관리사무소로 문의해 주세요"처럼 특정 대상을 콕 집으면
 # 지자체 카드만 뜨거나 둘 다 뜬 경우 어색하다 — 카드 자체가 이미 구체적인
 # 연락처를 보여주므로 문구는 일반적으로 남기고 "아래 연락처"로 안내한다.
-CARDS_NOTICE = "문의하신 내용과 관련된 자료를 확인하지 못했습니다. 아래 연락처를 확인해 주세요."
+CARDS_NOTICE = "문의하신 내용과 관련한 자료를 확인하지 못했습니다. 아래 연락처를 확인해 주세요."
 
 
 def _notice_text(cards: list[dict]) -> str:
@@ -182,7 +182,7 @@ def _extract_district(address: str) -> str:
     return ""
 
 
-def _local_gov_card(apartment) -> dict | None:
+def _local_gov_card(apartment, region: str | None = None) -> dict | None:
     """지자체 연락처 카드. (4차 추가분)
 
     서비스 관리자가 CSV(지자체명/전화번호/주소/담당부서 등)를 국가·
@@ -190,14 +190,25 @@ def _local_gov_card(apartment) -> dict | None:
     가 행마다 "헤더: 값" 한 줄로 바꿔 content_text 에 저장한다. 그 줄들
     중 이 단지 주소의 구/군/시 이름이 들어간 줄을 찾아 연락처를 뽑는다.
 
+    아파트 미설정 사용자는 region 코드의 한글 라벨로 매칭한다.
+
     CSV 헤더 이름이 정확히 뭐든("지자체명"/"기관명" 등) 최대한 유연하게
     대응한다 — "전화번호" 류 키가 없으면 그 줄 안에서 전화번호 패턴을
     직접 찾는다(_PHONE_RE, 단지 규정 전화번호 추출과 동일한 방식).
     """
-    if not apartment or not apartment.address:
-        return None
+    # 아파트 주소에서 구/군/시 추출 시도
+    district = ""
+    if apartment and apartment.address:
+        district = _extract_district(apartment.address)
 
-    district = _extract_district(apartment.address)
+    # 아파트가 없거나 주소에서 district를 못 뽑았으면 region 라벨로 대체
+    if not district and region:
+        from members.models import REGION_CHOICES
+        region_label = dict(REGION_CHOICES).get(region, "")
+        # "부산 남구" → "남구", "인천 미추홀구" → "미추홀구" 등 마지막 토큰 사용
+        # 단일 토큰("서울", "대구" 등)은 그대로
+        district = region_label.split()[-1] if region_label else ""
+
     if not district:
         return None
 
@@ -228,11 +239,12 @@ def _local_gov_card(apartment) -> dict | None:
     return None
 
 
-def _build_contact_cards(apartment_id: int | None) -> list[dict]:
+def _build_contact_cards(apartment_id: int | None, region: str | None = None) -> list[dict]:
     """근거를 못 찾았을 때 카드로 보여줄 연락처 목록. (4차 추가분)
 
     관리사무소 카드와 지자체 카드를 각각 시도해서 실제로 값이 있는
-    것만 담는다. 아무것도 못 찾으면 빈 리스트 — 호출부(ask())가
+    것만 담는다. 아파트 미설정 사용자는 region 기반으로 지자체 카드를
+    찾는다. 아무것도 못 찾으면 빈 리스트 — 호출부(ask())가
     FALLBACK_NOTICE 텍스트만으로 대체한다.
     """
     apartment = None
@@ -245,7 +257,7 @@ def _build_contact_cards(apartment_id: int | None) -> list[dict]:
     office = _office_card(apartment)
     if office:
         cards.append(office)
-    local_gov = _local_gov_card(apartment)
+    local_gov = _local_gov_card(apartment, region=region)
     if local_gov:
         cards.append(local_gov)
     return cards
@@ -617,7 +629,7 @@ def ask(
         # 문의로 안내하고, 등록된 연락처가 있으면 카드로 같이 보여준다 —
         # 실제로 답을 줄 수 있는 곳이 있으면 거기로 보내는 게 사용자에게
         # 더 도움이 된다.
-        contact_cards = [] if law_notice else _build_contact_cards(apartment_id)
+        contact_cards = [] if law_notice else _build_contact_cards(apartment_id, region=region)
         return {
             "answer": (
                 "관련 법령이 아직 시행되지 않아 현재 적용되는 근거를 찾을 수 없습니다."
@@ -647,7 +659,7 @@ def ask(
     # 없습니다" 를 그대로 노출하지 않고 관리사무소 문의로 안내한다.
     # 답과 무관한 sources 를 같이 보여주면 오해를 주므로 함께 비운다.
     if answer_text.startswith(NO_ANSWER):
-        refusal_cards = _build_contact_cards(apartment_id)
+        refusal_cards = _build_contact_cards(apartment_id, region=region)
         return {
             "answer": _notice_text(refusal_cards),
             "law": "",
