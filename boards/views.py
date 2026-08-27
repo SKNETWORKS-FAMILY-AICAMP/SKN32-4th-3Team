@@ -295,7 +295,7 @@ class BoardDeleteView(BoardDeletePermissionMixin, DeleteView):
         return super().form_valid(form)
 
 
-class BoardHideView(BoardDeletePermissionMixin, View):
+class BoardHideView(BoardDeletePermissionMixin, DetailView):
     """게시글 비공개/공개 토글 — POST 전용. 관리자(관리사무소/서비스운영자)만."""
 
     model = Board
