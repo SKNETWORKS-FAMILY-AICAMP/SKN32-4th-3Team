@@ -40,7 +40,7 @@ import logging
 
 from django.conf import settings
 
-from . import chunking, embeddings, vector_store
+from . import bm25_store, chunking, embeddings, scoring, vector_store
 
 logger = logging.getLogger(__name__)
 
@@ -120,13 +120,13 @@ def _find_phone_in_apartment_rules(apartment_id: int) -> str:
 
 # 근거를 못 찾았을 때 카드 없이 보여줄 최소 안내 문구.
 # "관련 정보를 찾을 수 없습니다" 류의 막연한 문구는 절대 쓰지 않는다.
-FALLBACK_NOTICE = "문의하신 내용과 관련된 자료를 확인하지 못했습니다. 정확한 안내는 관리사무소로 문의해 주세요."
+FALLBACK_NOTICE = "문의하신 내용과 관련한 자료를 확인하지 못했습니다. 지자체 또는 아파트 관리사무소에 문의해주세요."
 
 # 카드(관리사무소·지자체)가 하나라도 있을 때 쓰는 안내 문구.
 # "정확한 안내는 관리사무소로 문의해 주세요"처럼 특정 대상을 콕 집으면
 # 지자체 카드만 뜨거나 둘 다 뜬 경우 어색하다 — 카드 자체가 이미 구체적인
 # 연락처를 보여주므로 문구는 일반적으로 남기고 "아래 연락처"로 안내한다.
-CARDS_NOTICE = "문의하신 내용과 관련된 자료를 확인하지 못했습니다. 아래 연락처를 확인해 주세요."
+CARDS_NOTICE = "문의하신 내용과 관련한 자료를 확인하지 못했습니다. 아래 연락처를 확인해 주세요."
 
 
 def _notice_text(cards: list[dict]) -> str:
@@ -186,7 +186,7 @@ def _extract_district(address: str) -> str:
     return ""
 
 
-def _local_gov_card(apartment) -> dict | None:
+def _local_gov_card(apartment, region: str | None = None) -> dict | None:
     """지자체 연락처 카드. (4차 추가분)
 
     서비스 관리자가 CSV(지자체명/전화번호/주소/담당부서 등)를 국가·
@@ -194,14 +194,25 @@ def _local_gov_card(apartment) -> dict | None:
     가 행마다 "헤더: 값" 한 줄로 바꿔 content_text 에 저장한다. 그 줄들
     중 이 단지 주소의 구/군/시 이름이 들어간 줄을 찾아 연락처를 뽑는다.
 
+    아파트 미설정 사용자는 region 코드의 한글 라벨로 매칭한다.
+
     CSV 헤더 이름이 정확히 뭐든("지자체명"/"기관명" 등) 최대한 유연하게
     대응한다 — "전화번호" 류 키가 없으면 그 줄 안에서 전화번호 패턴을
     직접 찾는다(_PHONE_RE, 단지 규정 전화번호 추출과 동일한 방식).
     """
-    if not apartment or not apartment.address:
-        return None
+    # 아파트 주소에서 구/군/시 추출 시도
+    district = ""
+    if apartment and apartment.address:
+        district = _extract_district(apartment.address)
 
-    district = _extract_district(apartment.address)
+    # 아파트가 없거나 주소에서 district를 못 뽑았으면 region 라벨로 대체
+    if not district and region:
+        from members.models import REGION_CHOICES
+        region_label = dict(REGION_CHOICES).get(region, "")
+        # "부산 남구" → "남구", "인천 미추홀구" → "미추홀구" 등 마지막 토큰 사용
+        # 단일 토큰("서울", "대구" 등)은 그대로
+        district = region_label.split()[-1] if region_label else ""
+
     if not district:
         return None
 
@@ -232,11 +243,12 @@ def _local_gov_card(apartment) -> dict | None:
     return None
 
 
-def _build_contact_cards(apartment_id: int | None) -> list[dict]:
+def _build_contact_cards(apartment_id: int | None, region: str | None = None) -> list[dict]:
     """근거를 못 찾았을 때 카드로 보여줄 연락처 목록. (4차 추가분)
 
     관리사무소 카드와 지자체 카드를 각각 시도해서 실제로 값이 있는
-    것만 담는다. 아무것도 못 찾으면 빈 리스트 — 호출부(ask())가
+    것만 담는다. 아파트 미설정 사용자는 region 기반으로 지자체 카드를
+    찾는다. 아무것도 못 찾으면 빈 리스트 — 호출부(ask())가
     FALLBACK_NOTICE 텍스트만으로 대체한다.
     """
     apartment = None
@@ -249,7 +261,7 @@ def _build_contact_cards(apartment_id: int | None) -> list[dict]:
     office = _office_card(apartment)
     if office:
         cards.append(office)
-    local_gov = _local_gov_card(apartment)
+    local_gov = _local_gov_card(apartment, region=region)
     if local_gov:
         cards.append(local_gov)
     return cards
@@ -261,21 +273,11 @@ _LANGCHAIN_INDEX_DIR = "langchain"
 def _effective_min_score(min_score: float | None) -> float:
     """유사도 임계값을 결정한다.
 
-    백엔드마다 점수 스케일이 다르므로 같은 임계값을 쓸 수 없다.
-      - hash   : 표면 문자열 일치만 잡아 0.05~0.15 수준 → 전용 임계값 사용
-      - local  : sentence-transformers. 의미 기반이라 점수대가 높다
-      - gemini : 0.3~0.7 수준
-      - openai : 0.2~0.6 수준
-
-    hash 를 제외한 나머지는 RAG_MIN_SCORE 를 쓰되,
-    **백엔드를 바꾸면 manage.py measure_threshold 로 재측정해야 한다.**
-    (모델마다 유사도 분포가 달라 같은 값이 맞지 않는다)
+    파이프라인마다 score 스케일이 다르다는 문제가 생겨
+    판정 로직은 rag/scoring.py 로 옮겼다.
+    (RRF 는 순위 기반이라 이 임계값으로 판정하면 안 된다 — scoring.py 참고)
     """
-    if min_score is not None:
-        return min_score
-    if settings.EMBEDDING_BACKEND.lower() == "hash":
-        return settings.RAG_MIN_SCORE_LOCAL
-    return settings.RAG_MIN_SCORE
+    return scoring.effective_min_score(min_score)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -306,12 +308,16 @@ def _effective_min_score(min_score: float | None) -> float:
 #    manage.py measure_threshold 로 한 번 더 확인하십시오.
 
 
-def _retrieve(query: str, fetch_k: int) -> list[dict]:
+def _retrieve(query: str, fetch_k: int, region: str | None = None) -> list[dict]:
     """질문에 대한 후보 청크를 가져온다. 여기가 유일한 분기점이다.
 
-    반환 형식은 두 경로가 동일하다.
+    반환 형식은 네 경로가 동일하다.
         [{"content", "title", "document_id", "owner_id",
           "source_type", "region", "score"}, ...]
+
+    region 은 bm25/hybrid 에서만 쓴다. 후보 단계에서 다른 지역
+    문서를 빼두면 BM25 점수 경쟁이 줄어 지역 문서가 살아남는다.
+    (legacy/langchain 은 search() 의 사후 필터에 그대로 의존한다)
     """
     pipeline = settings.RAG_PIPELINE.lower()
 
@@ -327,13 +333,58 @@ def _retrieve(query: str, fetch_k: int) -> list[dict]:
         )
         return vector_store.search_with_langchain(store, query, fetch_k)
 
+    if pipeline == "bm25":
+        return bm25_store.search(query, fetch_k, region=region)
+
+    if pipeline == "hybrid":
+        query_vector = embeddings.embed_query(query)
+        dense = vector_store.search(query_vector, fetch_k)
+        sparse = bm25_store.search(query, fetch_k, region=region)
+        return _rrf_fuse(dense, sparse, fetch_k)
+
     if pipeline != "legacy":
         raise ValueError(
-            f"RAG_PIPELINE 값이 잘못되었습니다: {pipeline!r} (legacy 또는 langchain)"
+            f"RAG_PIPELINE 값이 잘못되었습니다: {pipeline!r} "
+            "(legacy, langchain, bm25, hybrid)"
         )
 
     query_vector = embeddings.embed_query(query)
     return vector_store.search(query_vector, fetch_k)
+
+
+def _rrf_fuse(dense: list[dict], sparse: list[dict], top_k: int) -> list[dict]:
+    """RRF(Reciprocal Rank Fusion)로 두 랭킹을 합친다.
+
+        score(d) = Σ 1 / (K + rank_i(d))
+
+    점수를 직접 더하지 않고 **순위만** 쓰는 이유:
+    코사인 유사도(0~1)와 BM25 raw(0~20+)는 스케일이 달라 정규화 없이는
+    더할 수 없고, 정규화 방식에 따라 결과가 흔들린다. 순위는 스케일이
+    없으므로 이 문제를 통째로 피한다.
+
+    ⚠️ 그 대가로 융합 점수는 **관련도를 뜻하지 않는다.** 무관한 질문에서도
+       1위 문서는 최댓값을 받는다. 그래서 임계값 판정은 여기서 보존한
+       vector_score / bm25_score 로 한다 — rag/scoring.py 참고.
+    """
+    k = scoring.rrf_k()
+    merged: dict[str, dict] = {}
+
+    for results, score_field in ((dense, "vector_score"), (sparse, "bm25_score")):
+        for rank, item in enumerate(results, 1):
+            key = f"{item.get('document_id')}::{item.get('chunk_index')}"
+            entry = merged.get(key)
+            if entry is None:
+                entry = dict(item)
+                entry["rrf_score"] = 0.0
+                merged[key] = entry
+            entry[score_field] = float(item.get("score", 0.0))
+            entry["rrf_score"] += 1.0 / (k + rank)
+
+    fused = sorted(merged.values(), key=lambda x: x["rrf_score"], reverse=True)
+    for item in fused:
+        item["rrf_score"] = round(item["rrf_score"], 6)
+        item["score"] = item["rrf_score"]
+    return fused[:top_k]
 
 
 # ─────────────────── 공개 API ───────────────────
@@ -371,12 +422,17 @@ def rebuild_index() -> dict:
     vectors = embeddings.embed_documents([c["content"] for c in chunks])
     count = vector_store.rebuild(chunks, vectors, embeddings.get_dimension())
 
+    # BM25 는 같은 chunks 로 만든다. 순서가 어긋나면 bm25_store.load() 가
+    # corpus_size 불일치로 막는다. 임베딩 API 를 쓰지 않으므로 비용 0.
+    bm25_store.rebuild(chunks)
+
     return {
         "documents": len(documents),
         "indexed_chunks": count,
         "source": settings.RAG_SOURCE,
         "embedding_backend": settings.EMBEDDING_BACKEND,
-        "pipeline": "legacy",
+        "pipeline": settings.RAG_PIPELINE.lower(),
+        "bm25_indexed": count,
     }
 
 
@@ -412,7 +468,7 @@ def search(
         + settings.RAG_TOP_K_COMMON
         + settings.RAG_TOP_K_LAW,
     ) * 25
-    results = _retrieve(query, fetch_k)
+    results = _retrieve(query, fetch_k, region=region)
 
     if owner_id is not None:
         results = [
@@ -440,7 +496,15 @@ def search(
     ]
 
     # 유사도 임계값 (환각 방지 1차 장치)
-    results = [r for r in results if r.get("score", 0.0) >= min_score]
+    #
+    # ⚠️ 파이프라인마다 score 스케일이 다르다. 예전엔 이 한 줄이
+    #    r["score"] >= min_score 였는데, hybrid 의 score 는 RRF(순위
+    #    역수의 합)라 이론상 최댓값이 2/(RRF_K+1) = 0.0328 이다.
+    #    RAG_MIN_SCORE(0.36)와 비교하면 전부 탈락해 모든 질문이
+    #    "관련 정보를 찾을 수 없습니다" 로 나간다. 반대로 bm25 의 raw
+    #    score 는 상한이 없어 0.36 으로는 아무것도 못 걸러 환각 방지가
+    #    무력화된다. 둘 다 에러 없이 조용히 일어난다.
+    results = scoring.filter_by_threshold(results, min_score, settings.RAG_PIPELINE)
 
     # 재색인이 백그라운드로 바뀌면서 필요해진 장치.
     # 문서를 지워도 다음 재색인 전까지는 청크가 인덱스에 남는다.
@@ -716,7 +780,7 @@ def ask(
         # 문의로 안내하고, 등록된 연락처가 있으면 카드로 같이 보여준다 —
         # 실제로 답을 줄 수 있는 곳이 있으면 거기로 보내는 게 사용자에게
         # 더 도움이 된다.
-        contact_cards = [] if law_notice else _build_contact_cards(apartment_id)
+        contact_cards = [] if law_notice else _build_contact_cards(apartment_id, region=region)
         return {
             "answer": (
                 "관련 법령이 아직 시행되지 않아 현재 적용되는 근거를 찾을 수 없습니다."
@@ -746,7 +810,7 @@ def ask(
     # 없습니다" 를 그대로 노출하지 않고 관리사무소 문의로 안내한다.
     # 답과 무관한 sources 를 같이 보여주면 오해를 주므로 함께 비운다.
     if answer_text.startswith(NO_ANSWER):
-        refusal_cards = _build_contact_cards(apartment_id)
+        refusal_cards = _build_contact_cards(apartment_id, region=region)
         return {
             "answer": _notice_text(refusal_cards),
             "law": "",

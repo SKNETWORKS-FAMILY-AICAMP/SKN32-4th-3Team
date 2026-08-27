@@ -81,6 +81,8 @@ class ChatRoomView(LoginRequiredMixin, View):
                 "apartment_name": str(chat_apartment) if chat_apartment else None,
                 "membership_role": chat_membership.get_role_display() if chat_membership else None,
                 "is_manager": bool(approved_membership and approved_membership.role == "manager"),
+                # 단지 없이 지역만 설정한 사용자용
+                "user_region_display": request.user.get_region_display() if request.user.region in _VALID_REGIONS else None,
             },
         )
 

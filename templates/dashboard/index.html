@@ -54,10 +54,10 @@
     <!-- 만족도 통계 -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px;margin-bottom:12px;">
       <h3 style="margin:0;">답변 피드백</h3>
-      <select id="feedback-apt-filter" onchange="loadFeedbackStats()" style="padding:4px 10px;border-radius:6px;border:1px solid #D5D5CF;font-size:13px;color:#3A3A35;background:#fff;">
+      <select id="feedback-region-filter" onchange="loadFeedbackStats()" style="padding:4px 10px;border-radius:6px;border:1px solid #D5D5CF;font-size:13px;color:#3A3A35;background:#fff;">
         <option value="">전체 (전국 통합)</option>
-        {% for item in apt_data %}
-        <option value="{{ item.apartment.pk }}">{{ item.apartment.name }}</option>
+        {% for code, label in region_choices %}
+        <option value="{{ code }}">{{ label }}</option>
         {% endfor %}
       </select>
     </div>

@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from django.conf import settings
+from . import usage
 
 # ─── sentence-transformers 모델 (지연 로드, 싱글톤) ───────────────
 _st_model = None
@@ -227,6 +228,8 @@ def _embed_api_cached(texts: list[str], backend: str) -> list[list[float]]:
     hit = len(texts) - len(missing)
     if hit:
         print(f"    캐시 재사용 {hit}개 / 신규 {len(missing)}개")
+        # 캐시 적중은 API 호출이 없으므로 비용 0. 절감분을 눈에 보이게 센다.
+        usage.record_cache_hit(hit)
 
     if missing:
         vectors = _embed_openai(missing) if backend == "openai" else _embed_gemini(missing)
@@ -268,6 +271,11 @@ def _embed_openai(texts: list[str]) -> list[list[float]]:
         # index 순서가 보장되지 않을 수 있어 정렬 후 사용
         vectors.extend(
             item.embedding for item in sorted(response.data, key=lambda d: d.index)
+        )
+        usage.record(
+            "embedding",
+            settings.OPENAI_EMBEDDING_MODEL,
+            usage.from_openai_embedding(response),
         )
         print(f"    임베딩 {min(start + batch_size, total)}/{total}")
 

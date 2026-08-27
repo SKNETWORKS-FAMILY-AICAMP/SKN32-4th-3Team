@@ -12,7 +12,7 @@ LLM 연동 (Gemini / OpenAI 전환 가능).
 """
 
 from django.conf import settings
-
+from . import usage
 
 # ─────────────────── 공통 호출부 ───────────────────
 
@@ -42,6 +42,8 @@ def _generate_gemini(prompt: str) -> str | None:
             model=settings.GEMINI_MODEL,
             contents=prompt,
         )
+        prompt_tokens, output_tokens = usage.from_gemini(response)
+        usage.record("llm", settings.GEMINI_MODEL, prompt_tokens, output_tokens)
         return (response.text or "").strip() or None
     except Exception as exc:
         msg = str(exc).lower()
@@ -66,10 +68,13 @@ def _generate_openai(prompt: str) -> str | None:
     try:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         response = client.chat.completions.create(
+            response = client.chat.completions.create(
             model=settings.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
         )
+        prompt_tokens, output_tokens = usage.from_openai_chat(response)
+        usage.record("llm", settings.OPENAI_MODEL, prompt_tokens, output_tokens)
         return (response.choices[0].message.content or "").strip() or None
     except Exception as exc:
         msg = str(exc).lower()

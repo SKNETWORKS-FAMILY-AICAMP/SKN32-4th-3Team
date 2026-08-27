@@ -320,9 +320,9 @@ async function submitAdminUpload() {
 async function loadFeedbackStats() {
   try {
     let url = CONFIG.urls.feedbackStats;
-    const aptFilter = document.getElementById('feedback-apt-filter');
-    if (aptFilter && aptFilter.value) {
-      url += '?apartment=' + encodeURIComponent(aptFilter.value);
+    const regionFilter = document.getElementById('feedback-region-filter');
+    if (regionFilter && regionFilter.value) {
+      url += '?region=' + encodeURIComponent(regionFilter.value);
     }
     const res = await fetch(url);
     if (!res.ok) return;

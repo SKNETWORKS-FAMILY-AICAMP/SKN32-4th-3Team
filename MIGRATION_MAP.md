@@ -334,19 +334,6 @@ python manage.py makemigrations --dry-run  → 5개 앱 모델 정상 생성
 | files 모드 업로드 색인 누락 | _load_documents() 가 폴더만 읽음 | manual 문서는 항상 DB에서 추가 로드 |
 | Windows 한글 경로 FAISS 오류 | write_index()가 한글 경로 거부 | serialize_index/deserialize_index 메모리 버퍼로 교체 |
 
-## 7. 실행 순서
-
-자세한 설명은 **RUN.md** 를 참고하십시오. 아래는 퀵스타트(SQLite + hash 임베딩) 요약입니다.
-
-```bash
-python -m venv .venv && .venv\Scripts\activate   # Windows
-pip install -r requirements-quickstart.txt
-
-copy .env.example .env   # DB_ENGINE=sqlite3, RAG_SOURCE=files,
-                         # EMBEDDING_BACKEND=hash, LLM_BACKEND=openai
-
-python manage.py migrate
-python manage.py createsuperuser
 python manage.py seed_docs --reindex   # 법령9+가이드15, 880청크
 python manage.py runserver
 ```
