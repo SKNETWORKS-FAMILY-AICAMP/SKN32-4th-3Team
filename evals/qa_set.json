@@ -14,7 +14,9 @@
     "region": "cheonan",
     "question": "달걀 껍질은 음식물쓰레기인가요?",
     "reference_answer": "아닙니다. 달걀·메추리알 껍질은 석회질이 많아 사료로 부적합하여 일반쓰레기(종량제봉투)로 배출해야 합니다.",
-    "forbidden_mention": ["음식물쓰레기로 배출"],
+    "forbidden_mention": [
+      "음식물쓰레기로 배출"
+    ],
     "should_have_answer": true
   },
   {
@@ -77,7 +79,9 @@
     "region": "seoul",
     "question": "폐의약품은 어디에 버리나요?",
     "reference_answer": "폐의약품은 약국, 보건소, 주민센터 등에 설치된 폐의약품 전용 수거함에 배출합니다. 서울은 우체통에 투입하는 방법도 가능합니다.",
-    "forbidden_mention": ["종량제봉투"],
+    "forbidden_mention": [
+      "종량제봉투"
+    ],
     "should_have_answer": true
   },
   {
@@ -113,7 +117,11 @@
     "region": "busan_namgu",
     "question": "쓰레기 배출 시간이 어떻게 되나요?",
     "reference_answer": "부산 남구는 저녁 7시부터 밤 11시 사이에 대문 앞이나 업소 출입구에 배출합니다.",
-    "forbidden_mention": ["서울", "천안", "세종"],
+    "forbidden_mention": [
+      "서울",
+      "천안",
+      "세종"
+    ],
     "should_have_answer": true
   },
   {
@@ -122,7 +130,11 @@
     "region": "busan_namgu",
     "question": "음식물쓰레기는 어떻게 버리나요?",
     "reference_answer": "부산 남구는 음식물쓰레기 전용용기에 담고 납부필증을 부착하여 배출합니다. 전용용기는 지정 판매소에서 구입합니다.",
-    "forbidden_mention": ["서울", "천안", "RFID"],
+    "forbidden_mention": [
+      "서울",
+      "천안",
+      "RFID"
+    ],
     "should_have_answer": true
   },
   {
@@ -131,7 +143,11 @@
     "region": "busan_namgu",
     "question": "비닐은 무슨 요일에 버리나요?",
     "reference_answer": "부산 남구는 비닐류를 매주 월요일에 배출합니다.",
-    "forbidden_mention": ["서울", "천안", "제주"],
+    "forbidden_mention": [
+      "서울",
+      "천안",
+      "제주"
+    ],
     "should_have_answer": true
   },
   {
@@ -140,7 +156,10 @@
     "region": "cheonan",
     "question": "투명 페트병 별도 배출 요일이 있나요?",
     "reference_answer": "네, 천안시는 투명 폐페트병 분리배출 시범사업에 따라 목요일에 투명 페트병만 별도로 배출합니다.",
-    "forbidden_mention": ["서울", "부산"],
+    "forbidden_mention": [
+      "서울",
+      "부산"
+    ],
     "should_have_answer": true
   },
   {
@@ -149,7 +168,11 @@
     "region": "jeju",
     "question": "제주에서 재활용품은 어디에 버리나요?",
     "reference_answer": "제주는 집 앞 문전수거가 아니라 클린하우스나 재활용도움센터에 직접 가져가 배출합니다.",
-    "forbidden_mention": ["서울", "부산", "천안"],
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안"
+    ],
     "should_have_answer": true
   },
   {
@@ -158,7 +181,10 @@
     "region": "jeju",
     "question": "제주에서 음식물쓰레기 배출 방법은?",
     "reference_answer": "제주는 클린하우스나 재활용도움센터의 RFID 개별계량장비에 티머니 교통카드를 대고 무게만큼 수수료를 결제하여 배출합니다.",
-    "forbidden_mention": ["전용봉투", "납부필증"],
+    "forbidden_mention": [
+      "전용봉투",
+      "납부필증"
+    ],
     "should_have_answer": true
   },
   {
@@ -167,7 +193,9 @@
     "region": "sejong",
     "question": "세종시에서 일반쓰레기는 어디에 버리나요?",
     "reference_answer": "세종시 동지역은 종량제봉투에 담아 자동크린넷 투입구에 투입하고, 읍면지역은 지정 장소에 내놓는 문전수거 방식입니다.",
-    "forbidden_mention": ["클린하우스"],
+    "forbidden_mention": [
+      "클린하우스"
+    ],
     "should_have_answer": true
   },
   {
@@ -176,7 +204,10 @@
     "region": "incheon_michuhol",
     "question": "인천 미추홀구 재활용품 배출 요일은?",
     "reference_answer": "인천 미추홀구는 동별로 두 그룹으로 나뉩니다. 월·수·금 배출 동과 화·목·일 배출 동이 있으며, 저녁 시간에 투명봉투에 담아 문앞에 배출합니다.",
-    "forbidden_mention": ["서울", "부산"],
+    "forbidden_mention": [
+      "서울",
+      "부산"
+    ],
     "should_have_answer": true
   },
   {
@@ -248,7 +279,10 @@
     "region": "seoul",
     "question": "의료폐기물은 어떻게 처리하나요?",
     "reference_answer": "의료폐기물은 별도의 처리 절차를 따라야 하며, 관할 보건소나 전문 처리업체에 문의해야 합니다. 폐의약품의 경우 약국, 보건소 등의 전용 수거함에 배출합니다.",
-    "forbidden_mention": ["종량제봉투", "분리배출함"],
+    "forbidden_mention": [
+      "종량제봉투",
+      "분리배출함"
+    ],
     "should_have_answer": true
   },
   {
@@ -257,7 +291,11 @@
     "region": "seoul",
     "question": "전기차 폐배터리는 어디에 버리나요?",
     "reference_answer": "전기차 폐배터리 관련 자료는 보유하고 있지 않습니다.",
-    "forbidden_mention": ["전지류 수거함", "전용 수거함에 배출", "주민센터"],
+    "forbidden_mention": [
+      "전지류 수거함",
+      "전용 수거함에 배출",
+      "주민센터"
+    ],
     "should_have_answer": false,
     "note": "폐건전지 안내를 전기차 폐배터리에 적용하면 오답."
   },
@@ -270,5 +308,1285 @@
     "forbidden_mention": [],
     "should_have_answer": false,
     "note": "완전히 무관한 주제."
+  },
+  {
+    "id": "q031",
+    "type": "region_specific",
+    "region": "daegu",
+    "question": "대구에서 음식물쓰레기는 어떻게 버리나요?",
+    "reference_answer": "대구는 음식물 전용용기(3·5·20·120리터)에 담아 배출합니다. 비닐봉투에 담긴 음식물은 전용용기 안에 들어 있어도 수거하지 않으며, 물기를 제거하고 용기 안에 비닐봉투를 사용하면 안 됩니다. 단독주택은 용기 손잡이에 납부필증을 부착해 대문 앞에 배출하고, RFID 종량기를 쓰는 공동주택은 납부필증이 필요 없습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "food_waste_method",
+    "source_doc": "[가이드]_대구시_분리배출_요령.txt"
+  },
+  {
+    "id": "q032",
+    "type": "region_specific",
+    "region": "daegu",
+    "question": "대구에서 부탄가스통은 어떻게 버려요?",
+    "reference_answer": "구멍을 뚫어 내용물을 제거하고 플라스틱 뚜껑을 분리한 뒤 캔류로 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대구시_분리배출_요령.txt"
+  },
+  {
+    "id": "q033",
+    "type": "region_specific",
+    "region": "daegu",
+    "question": "대구 북구는 쓰레기를 몇 시에 내놓나요?",
+    "reference_answer": "대구 북구는 일요일부터 금요일까지 저녁 8시부터 다음날 새벽 2시 사이에 문전수거로 배출하며, 토요일은 배출하지 않습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "disposal_time",
+    "source_doc": "[가이드]_대구시_분리배출_요령.txt"
+  },
+  {
+    "id": "q034",
+    "type": "region_specific",
+    "region": "daegu",
+    "question": "대구 수성구에서 대형폐기물은 어떻게 신고하나요?",
+    "reference_answer": "수성구는 구청 홈페이지에서 배출 신고와 수수료 결제를 하고, 신고 후 다음 수거요일에 수거해 갑니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대구시_분리배출_요령.txt"
+  },
+  {
+    "id": "q035",
+    "type": "region_specific",
+    "region": "daegu",
+    "question": "대구에서 안 쓰는 드라이기나 믹서기는 어디에 버리나요?",
+    "reference_answer": "중소형 폐가전은 동 행정복지센터의 소형가전 수거함에 배출합니다. 5개 이상이면 폐가전 무상방문수거를 이용할 수 있습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대구시_분리배출_요령.txt"
+  },
+  {
+    "id": "q036",
+    "type": "region_specific",
+    "region": "daegu",
+    "question": "대구에서 폐식용유는 어디에 버리나요?",
+    "reference_answer": "의류와 폐식용유는 민간 재활용사업자가 설치한 수거함에 배출합니다. 폐식용유는 찌꺼기나 빗물이 섞이지 않도록 주의합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대구시_분리배출_요령.txt"
+  },
+  {
+    "id": "q037",
+    "type": "region_specific",
+    "region": "daejeon",
+    "question": "대전 서구에서 금요일에 쓰레기를 내놓아도 되나요?",
+    "reference_answer": "안 됩니다. 대전 서구는 금요일과 토요일이 모든 쓰레기를 배출하지 않는 날입니다. 이 날 내놓으면 다음 수거일까지 그대로 남습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "disposal_time",
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q038",
+    "type": "region_specific",
+    "region": "daejeon",
+    "question": "대전에서 음식물쓰레기는 어떻게 버리나요?",
+    "reference_answer": "일반지역은 음식물 전용수거용기에 담고 용기 용량에 맞는 납부필증을 부착해 배출합니다. 납부필증은 종량제봉투 판매소에서 구입하며, 서구 기준으로 3리터 180원, 5리터 300원, 20리터 1,200원입니다. 이물질을 제거하고 물기를 최대한 줄여 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "food_waste_method",
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q039",
+    "type": "region_specific",
+    "region": "daejeon",
+    "question": "대전에서 50리터 종량제봉투에 얼마나 담을 수 있나요?",
+    "reference_answer": "50리터 종량제봉투는 13킬로그램, 75리터는 19킬로그램까지만 담을 수 있습니다. 50리터와 75리터 봉투에는 압축기를 사용할 수 없습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q040",
+    "type": "region_specific",
+    "region": "daejeon",
+    "question": "대전에서 폐의약품은 어디에 버리나요?",
+    "reference_answer": "대전은 전용 수거함 배출 방식이며 종량제봉투에 버리지 않습니다. 수거함은 약국, 보건소와 보건지소·보건진료소, 동 행정복지센터, 구청에 설치되어 있습니다.",
+    "forbidden_mention": [
+      "종량제봉투에 버",
+      "우체통",
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q041",
+    "type": "region_specific",
+    "region": "daejeon",
+    "question": "대전 유성구 도안 지역은 쓰레기를 어떻게 버리나요?",
+    "reference_answer": "도안 지역은 종량제봉투와 음식물쓰레기를 크린넷 투입구에 투입합니다. 크린넷 지역의 음식물쓰레기는 전용봉투를 사용합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q042",
+    "type": "region_specific",
+    "region": "daejeon",
+    "question": "대전에서 대형폐기물을 신고 없이 버리면 어떻게 되나요?",
+    "reference_answer": "무단 투기하면 폐기물관리법 제68조에 따라 과태료가 부과됩니다. 대형폐기물은 자치구청 인터넷 배출신고 시스템이나 동 행정복지센터 방문, 빼기 앱으로 신고하고 수수료를 납부한 뒤 스티커를 부착해 배출해야 합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q043",
+    "type": "region_specific",
+    "region": "ulsan",
+    "question": "울산 동구는 쓰레기를 몇 시에 내놓나요?",
+    "reference_answer": "울산 동구는 저녁 8시부터 자정 사이에 종량제 규격봉투에 담아 반드시 묶어서 배출합니다. 단독주택은 대문 앞, 공동주택은 지정 수거용기에 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "disposal_time",
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt"
+  },
+  {
+    "id": "q044",
+    "type": "region_specific",
+    "region": "ulsan",
+    "question": "울산에서 토요일에 쓰레기를 수거하나요?",
+    "reference_answer": "울산 동구 기준으로 수거일은 월요일부터 금요일까지 매일이며, 토요일과 일요일, 공휴일에는 수거하지 않습니다. 수거일이 아닌 날의 전날 저녁부터는 생활쓰레기를 내놓으면 안 됩니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt"
+  },
+  {
+    "id": "q045",
+    "type": "region_specific",
+    "region": "ulsan",
+    "question": "울산에서 재활용품을 검은 봉투에 담아 내놓아도 되나요?",
+    "reference_answer": "안 됩니다. 검은 봉투처럼 내용물이 보이지 않는 봉투로 배출하면 불법투기로 간주되어 과태료가 부과됩니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt"
+  },
+  {
+    "id": "q046",
+    "type": "region_specific",
+    "region": "ulsan",
+    "question": "울산에서 음식물쓰레기는 어떻게 버리나요?",
+    "reference_answer": "사료나 퇴비로 재활용하기 위해 비닐이나 쇠 조각 같은 이물질과 물기를 완전히 제거한 뒤 배출합니다. 남구 기준으로는 공동 수집용기(120리터)용 납부필증을 구입해 용기 측면의 납부필증 보관함에 끼워 지정 배출요일에 배출합니다. 통무나 통배추처럼 큰 덩어리는 잘게 부수어 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "food_waste_method",
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt"
+  },
+  {
+    "id": "q047",
+    "type": "region_specific",
+    "region": "ulsan",
+    "question": "울산에서 폐타이어는 어디에 버리나요?",
+    "reference_answer": "타이어, 윤활유, 자동차부품은 구·군 수거 대상이 아니라 판매소를 통한 역회수로 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt"
+  },
+  {
+    "id": "q048",
+    "type": "region_specific",
+    "region": "ulsan",
+    "question": "울산 남구에서 재활용품 담을 그물망을 받을 수 있나요?",
+    "reference_answer": "네. 울산 남구는 재활용품을 담는 그물망을 주소지 동 행정복지센터에서 무료로 배부하며, 분실하면 재교부받을 수 있습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt"
+  },
+  {
+    "id": "q049",
+    "type": "region_specific",
+    "region": "suwon",
+    "question": "수원에서 쓰레기는 몇 시에 내놓나요?",
+    "reference_answer": "수원시는 오후 8시부터 다음날 오전 5시 사이에 자기 집 앞이나 상가 앞에 배출합니다. 수거는 오전 6시부터 시작합니다. 낮에 쓰레기를 내놓는 행위는 무단투기에 해당합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "disposal_time",
+    "source_doc": "[가이드]_수원시_분리배출_요령.txt"
+  },
+  {
+    "id": "q050",
+    "type": "region_specific",
+    "region": "suwon",
+    "question": "수원 자원순환역 음식물 수거함은 어떤 카드로 결제하나요?",
+    "reference_answer": "캐시비 교통카드에 1,000원 이상 충전해서 사용합니다. 액세서리형 카드와 후불제 교통카드, 티머니, 신용카드는 사용할 수 없습니다. 수거함이 고장 났을 때는 1688-1186으로 문의합니다.",
+    "forbidden_mention": [
+      "티머니",
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "food_waste_method",
+    "source_doc": "[가이드]_수원시_분리배출_요령.txt"
+  },
+  {
+    "id": "q051",
+    "type": "region_specific",
+    "region": "suwon",
+    "question": "수원 자원순환역은 어떤 곳인가요?",
+    "reference_answer": "종량제봉투, 음식물쓰레기, 재활용품 7종을 배출 시간에 구애받지 않고 상시 배출할 수 있는 공간입니다. 2022년부터 모든 자원순환역에 관리사가 배치되어 오전 8시부터 정오, 오후 5시부터 9시까지 분리배출을 도와줍니다. 상시 배출 장소인 에코스테이션도 14개소 운영합니다.",
+    "forbidden_mention": [
+      "클린하우스",
+      "자동크린넷",
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_수원시_분리배출_요령.txt"
+  },
+  {
+    "id": "q052",
+    "type": "region_specific",
+    "region": "suwon",
+    "question": "수원에서 다 쓴 건전지를 가져가면 혜택이 있나요?",
+    "reference_answer": "네. 동 행정복지센터에서 폐건전지 20개를 새 건전지 1세트(2개)로 교환해 줍니다. 전용수거함에 넣거나 투명한 봉투에 담아 배출하며, 일반폐기물과 섞어 배출하면 화재 위험이 있습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_수원시_분리배출_요령.txt"
+  },
+  {
+    "id": "q053",
+    "type": "region_specific",
+    "region": "suwon",
+    "question": "수원에서 백열등은 어떻게 버리나요?",
+    "reference_answer": "백열등은 재활용이 되지 않으므로 종량제봉투에 담아 배출합니다. 깨진 형광등은 신문지로 감싼 뒤 전용수거함에 넣거나 묶어서 수거장소에 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_수원시_분리배출_요령.txt"
+  },
+  {
+    "id": "q054",
+    "type": "region_specific",
+    "region": "suwon",
+    "question": "수원에서 명함이나 영수증은 종이류로 배출하나요?",
+    "reference_answer": "아닙니다. 영수증(감열지), 비닐 코팅지, 명함, 금·은박지, 천연재료 벽지, PVC 코팅 벽지, 부직포는 종량제봉투로 배출해야 합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_수원시_분리배출_요령.txt"
+  },
+  {
+    "id": "q055",
+    "type": "region_specific",
+    "region": "seoul",
+    "question": "서울에서 보냉용 택배 상자는 어떻게 버리나요?",
+    "reference_answer": "비닐이나 알루미늄 안감이 있는 보냉용 택배 상자는 종이류로 재활용되지 않아 종량제봉투에 배출합니다.",
+    "forbidden_mention": [
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q056",
+    "type": "region_specific",
+    "region": "seoul",
+    "question": "서울에서 시럽이나 연고도 우체통에 넣으면 되나요?",
+    "reference_answer": "안 됩니다. 서울시는 폐의약품 우체통 배출 시행 지역이지만, 물약·시럽·연고는 우체통에 넣지 말고 약국이나 보건소의 전용 수거함에 배출해야 합니다.",
+    "forbidden_mention": [
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q057",
+    "type": "region_specific",
+    "region": "seoul",
+    "question": "서울 아파트에서 투명페트병은 요일을 지켜야 하나요?",
+    "reference_answer": "공동주택은 요일과 관계없이 투명페트병 전용수거함에 상시 배출합니다. 요일제는 단독주택과 상가에 적용되며, 음료·생수용 무색 투명페트병만 전용수거함 대상이고 유색 페트병은 플라스틱류로 배출합니다.",
+    "forbidden_mention": [
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q058",
+    "type": "region_specific",
+    "region": "busan_namgu",
+    "question": "부산 남구에서 연탄재는 어떻게 버리나요?",
+    "reference_answer": "연탄재는 불에 안 타는 쓰레기와 함께 전용마대(특수규격마대)를 사용하여 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_부산남구_분리배출_요령.txt"
+  },
+  {
+    "id": "q059",
+    "type": "region_specific",
+    "region": "busan_namgu",
+    "question": "부산 남구에서 재활용품은 어떤 봉투에 담나요?",
+    "reference_answer": "품목별로 끈으로 묶거나 흰색(투명) 봉투에 넣어 배출합니다. 이물질을 제거하고 내용물이 보이는 투명 봉지에 담아야 합니다.",
+    "forbidden_mention": [
+      "서울",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_부산남구_분리배출_요령.txt"
+  },
+  {
+    "id": "q060",
+    "type": "region_specific",
+    "region": "busan_namgu",
+    "question": "부산 남구에서 소형 가전제품은 어디에 버리나요?",
+    "reference_answer": "소형폐가전 수거함에 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_제주_분리배출_요령.txt"
+  },
+  {
+    "id": "q061",
+    "type": "region_specific",
+    "region": "cheonan",
+    "question": "천안에서 음식물쓰레기와 일반쓰레기를 섞어 버리면 어떻게 되나요?",
+    "reference_answer": "일반쓰레기와 혼합 배출하면 100만원 이하의 과태료가 부과됩니다. 음식물류 폐기물은 배출 전에 물기를 제거해야 합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_천안시_분리배출_요령.txt"
+  },
+  {
+    "id": "q062",
+    "type": "region_specific",
+    "region": "cheonan",
+    "question": "천안에서 음식물쓰레기는 무엇에 담아 버리나요?",
+    "reference_answer": "음식물쓰레기 전용봉투에 담아 배출하며, 전용봉투는 지정된 판매소에서 구입합니다. 물기와 큰뼈·비닐·병뚜껑·이쑤시개·패각류 같은 이물질을 제거한 뒤 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "food_waste_method",
+    "source_doc": "[가이드]_천안시_분리배출_요령.txt"
+  },
+  {
+    "id": "q063",
+    "type": "region_specific",
+    "region": "cheonan",
+    "question": "천안에서 복숭아씨는 음식물쓰레기인가요?",
+    "reference_answer": "아닙니다. 복숭아·살구·감 같은 핵과류 씨앗은 일반쓰레기로 배출해야 합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_천안시_분리배출_요령.txt"
+  },
+  {
+    "id": "q064",
+    "type": "region_specific",
+    "region": "sejong",
+    "question": "세종시 아파트에서 음식물쓰레기는 어떻게 버리나요?",
+    "reference_answer": "세종시 동지역은 음식물 전용 종량제봉투(1·2·3·5·10·20리터)에 담아 자동크린넷 음식물 투입구에 투입합니다. 읍·면지역은 음식물 전용 수거용기에 담고 납부필증을 부착하여 지정 장소에 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "food_waste_method",
+    "source_doc": "[가이드]_세종시_분리배출_요령.txt"
+  },
+  {
+    "id": "q065",
+    "type": "region_specific",
+    "region": "sejong",
+    "question": "세종시 자동크린넷에 소형가전을 넣어도 되나요?",
+    "reference_answer": "안 됩니다. 2025년 세종특별자치시 폐기물 관리 조례 개정으로 소형폐가전, 대형폐기물, 자동집하시설 고장을 유발하는 생활폐기물, 공사장 생활폐기물, 생활계 유해폐기물은 투입할 수 없습니다. 투입구에 넣지 않고 주변에 쌓아 두는 것도 위반입니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_세종시_분리배출_요령.txt"
+  },
+  {
+    "id": "q066",
+    "type": "region_specific",
+    "region": "sejong",
+    "question": "세종시에서 우유팩은 종이류에 같이 넣나요?",
+    "reference_answer": "아닙니다. 세종시는 종이팩을 일반 종이류와 분리해 별도로 회수하는 체계를 운영하며, 공동주택과 상가 등에 종이팩 별도회수처를 지정해 두고 있습니다. 자원순환 이응가게에 가져가면 세종시티앱 포인트로 적립받을 수 있습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_세종시_분리배출_요령.txt"
+  },
+  {
+    "id": "q067",
+    "type": "region_specific",
+    "region": "incheon_michuhol",
+    "question": "인천 미추홀구에서 일반쓰레기는 언제 내놓나요?",
+    "reference_answer": "종량제봉투에 담아 일·월·화·수·목·금요일 저녁 7시부터 12시 사이에 배출합니다. 토요일을 제외하고 매일 배출할 수 있으며, 재활용품이나 음식물을 섞어 배출하면 수거하지 않습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "disposal_time",
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q068",
+    "type": "region_specific",
+    "region": "incheon_michuhol",
+    "question": "인천 미추홀구에서 페트병을 가져가면 보상을 받을 수 있나요?",
+    "reference_answer": "네. 스마트 페트병 무인수거기가 관내 지역거점 35개소에서 24시간 운영되며 투입한 만큼 개당 현금으로 유가보상을 받습니다. 미추 자원순환가게에서는 자원관리사가 무게를 측정해 현금이나 인천e음 포인트로 보상합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_인천미추홀구_분리배출_요령.txt"
+  },
+  {
+    "id": "q069",
+    "type": "region_specific",
+    "region": "incheon_michuhol",
+    "question": "인천 미추홀구에서 안 쓰는 장난감은 어떻게 버리나요?",
+    "reference_answer": "쓸 만한 장난감은 종량제봉투나 대형폐기물로 버리지 말고 구에서 운영하는 무상 수거함을 이용합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_인천미추홀구_분리배출_요령.txt"
+  },
+  {
+    "id": "q070",
+    "type": "region_specific",
+    "region": "jeju",
+    "question": "제주에서 종이류는 무슨 요일에 버리나요?",
+    "reference_answer": "제주시 기준으로 종이류는 화·목·토요일에 배출합니다. 플라스틱은 월·수·금·일요일, 비닐류는 목·일요일, 불연성쓰레기는 화·토요일이며 병류와 스티로폼, 캔·고철은 매일 배출할 수 있습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_제주_분리배출_요령.txt"
+  },
+  {
+    "id": "q071",
+    "type": "region_specific",
+    "region": "jeju",
+    "question": "제주 클린하우스는 몇 시에 이용할 수 있나요?",
+    "reference_answer": "오후 3시부터 다음 날 오전 4시까지 배출할 수 있고 그 외 시간에는 투입구가 차단됩니다. 음식물쓰레기는 예외로 24시간 배출할 수 있습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "parallel_group": "disposal_time",
+    "source_doc": "[가이드]_제주_분리배출_요령.txt"
+  },
+  {
+    "id": "q072",
+    "type": "region_specific",
+    "region": "jeju",
+    "question": "제주에서 간장병이나 식용유병 같은 투명페트병은 어디에 넣나요?",
+    "reference_answer": "생수·음료용이 아닌 투명페트병(양념류, 식용유, 워셔액, 손세정제 등)은 플라스틱 수거함에 배출합니다. 투명페트병 전용수거함은 생수·음료용 무색 투명페트병 전용입니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_제주_분리배출_요령.txt",
+    "note": "전용수거함과 플라스틱 수거함을 가르는 함정 문항"
+  },
+  {
+    "id": "q073",
+    "type": "region_specific",
+    "region": "daegu",
+    "question": "음식물쓰레기를 비닐봉투에 담아 전용용기에 넣어도 되나요?",
+    "reference_answer": "대구는 비닐봉투에 담긴 음식물은 전용용기 안에 들어 있어도 수거하지 않습니다. 용기 안에 비닐봉투를 사용해서는 안 되며 물기를 제거하고 배출합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_대구시_분리배출_요령.txt",
+    "note": "질문에 지역 단서가 없다. region 을 넘기지 않으면 맞힐 수 없는 대조군"
+  },
+  {
+    "id": "q074",
+    "type": "region_specific",
+    "region": "suwon",
+    "question": "음식물 수거함에 어떤 카드를 쓰나요?",
+    "reference_answer": "수원 자원순환역의 음식물 RFID 수거함은 캐시비 교통카드만 사용할 수 있습니다. 티머니와 후불제 교통카드, 신용카드, 액세서리형 카드는 사용할 수 없습니다.",
+    "forbidden_mention": [
+      "티머니"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_수원시_분리배출_요령.txt",
+    "note": "제주는 티머니, 수원은 캐시비. 지역 단서 없이 물었을 때 혼동하는지 본다"
+  },
+  {
+    "id": "q075",
+    "type": "region_specific",
+    "region": "jeju",
+    "question": "음식물쓰레기 계량기에 어떤 카드를 대나요?",
+    "reference_answer": "제주는 클린하우스나 재활용도움센터의 음식물 개별계량장비(RFID)에 티머니 교통카드를 대고 무게만큼 수수료를 결제합니다. 카드 잔액이 1,000원 이상이어야 합니다.",
+    "forbidden_mention": [
+      "캐시비"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_제주_분리배출_요령.txt"
+  },
+  {
+    "id": "q076",
+    "type": "region_specific",
+    "region": "daejeon",
+    "question": "금요일에는 쓰레기를 못 내놓나요?",
+    "reference_answer": "대전 서구는 금요일과 토요일이 모든 쓰레기를 배출하지 않는 날입니다. 대덕구는 일요일에 모든 생활폐기물을 수거하지 않습니다. 거주 자치구의 안 버리는 날을 먼저 확인해야 합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_대전시_분리배출_요령.txt"
+  },
+  {
+    "id": "q077",
+    "type": "region_specific",
+    "region": "ulsan",
+    "question": "재활용품을 검은 봉투에 담으면 어떻게 되나요?",
+    "reference_answer": "울산은 검은 봉투처럼 내용물이 보이지 않는 봉투로 배출하면 불법투기로 간주되어 과태료가 부과됩니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt"
+  },
+  {
+    "id": "q078",
+    "type": "region_specific",
+    "region": "sejong",
+    "question": "일반쓰레기는 어디에 넣나요?",
+    "reference_answer": "세종시 동지역은 종량제봉투에 담아 자동크린넷 투입구에 투입하고, 읍·면지역은 지정 장소에 배출합니다. 투입구는 일반쓰레기용과 음식물쓰레기용이 구분되어 있으며 키나 카드로 열어 투입합니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "제주",
+      "인천",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_세종시_분리배출_요령.txt"
+  },
+  {
+    "id": "q079",
+    "type": "single_fact",
+    "region": "cheonan",
+    "question": "조개 껍데기는 음식물쓰레기인가요?",
+    "reference_answer": "아닙니다. 조개·소라·전복·꼬막·멍게·굴·홍합 같은 어패류 껍데기는 일반쓰레기(종량제봉투)로 배출합니다.",
+    "forbidden_mention": [
+      "음식물쓰레기로 배출"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_천안시_분리배출_요령.txt"
+  },
+  {
+    "id": "q080",
+    "type": "single_fact",
+    "region": "cheonan",
+    "question": "양파 껍질은 음식물쓰레기예요?",
+    "reference_answer": "아닙니다. 양파 껍질과 마늘 껍질, 채소 뿌리는 일반쓰레기(종량제봉투)로 배출합니다.",
+    "forbidden_mention": [
+      "음식물쓰레기로 배출"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_천안시_분리배출_요령.txt"
+  },
+  {
+    "id": "q081",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "복숭아씨는 어디에 버리나요?",
+    "reference_answer": "딱딱한 과일 껍데기와 씨앗(복숭아, 감, 망고 등)은 일반쓰레기(종량제봉투)로 배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q082",
+    "type": "single_fact",
+    "region": "cheonan",
+    "question": "호두나 밤 껍질은 음식물인가요?",
+    "reference_answer": "아닙니다. 견과류 껍질(호두, 밤, 땅콩)은 일반쓰레기(종량제봉투)로 배출합니다.",
+    "forbidden_mention": [
+      "음식물쓰레기로 배출"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_천안시_분리배출_요령.txt"
+  },
+  {
+    "id": "q083",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "커피 찌꺼기는 음식물쓰레기인가요?",
+    "reference_answer": "아닙니다. 일회용 티백과 한약재 찌꺼기, 커피 찌꺼기는 일반쓰레기(종량제봉투)로 배출합니다.",
+    "forbidden_mention": [
+      "음식물쓰레기로 배출"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q084",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "닭뼈는 음식물쓰레기인가요?",
+    "reference_answer": "아닙니다. 육류와 생선의 뼈(닭뼈, 돼지뼈, 소뼈, 생선뼈)는 일반쓰레기(종량제봉투)로 배출합니다.",
+    "forbidden_mention": [
+      "음식물쓰레기로 배출"
+    ],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q085",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "고무장갑은 어떻게 버리나요?",
+    "reference_answer": "고무장갑과 고무호스, 랩, 식탁보, 현수막은 재활용이 되지 않아 종량제봉투로 배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q086",
+    "type": "single_fact",
+    "region": "cheonan",
+    "question": "알루미늄 호일은 캔류로 배출하나요?",
+    "reference_answer": "아닙니다. 알루미늄 호일은 종량제봉투로 배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_천안시_분리배출_요령.txt"
+  },
+  {
+    "id": "q087",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "칫솔은 플라스틱으로 배출하나요?",
+    "reference_answer": "아닙니다. 칫솔과 옷걸이, CD·DVD, 플라스틱 완구·문구류는 혼합재질이라 종량제봉투로 배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q088",
+    "type": "single_fact",
+    "region": "seoul",
+    "question": "음식물이 묻은 스티로폼은 어떻게 버리나요?",
+    "reference_answer": "음식물이 묻은 스티로폼과 과일 포장용 망은 종량제봉투로 배출합니다. 깨끗한 스티로폼 상자는 라벨을 제거한 뒤 분리배출합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q089",
+    "type": "cross_reference",
+    "region": "seoul",
+    "question": "분리배출 요일을 안 지키면 벌금이 있나요?",
+    "reference_answer": "요일과 시간을 지키지 않거나 종량제봉투를 쓰지 않으면 자치구 조례에 따라 최대 100만원의 과태료가 부과될 수 있습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_서울시_분리배출_요령.txt"
+  },
+  {
+    "id": "q090",
+    "type": "cross_reference",
+    "region": "incheon_michuhol",
+    "question": "분리배출을 위반하면 과태료가 얼마인가요?",
+    "reference_answer": "인천 미추홀구는 재활용품에 생활쓰레기나 음식물을 섞어 배출하면 수거하지 않으며, 분리배출 위반 시 10만원 이하의 과태료가 부과될 수 있습니다.",
+    "forbidden_mention": [
+      "서울",
+      "부산",
+      "천안",
+      "세종",
+      "제주",
+      "대구",
+      "대전",
+      "울산",
+      "수원"
+    ],
+    "should_have_answer": true,
+    "region_explicit": true,
+    "source_doc": "[가이드]_인천미추홀구_분리배출_요령.txt"
+  },
+  {
+    "id": "q091",
+    "type": "cross_reference",
+    "region": "ulsan",
+    "question": "공사하고 나온 쓰레기는 어떻게 버리나요?",
+    "reference_answer": "착공부터 완료까지 전체 배출량이 5톤 미만인 공사에서 나온 폐기물이 공사장 생활폐기물입니다. 그중 가연성 폐기물은 관할 구·군이 지정한 종량제봉투에 담아 배출하며, 5톤 이상 발생하면 사업장폐기물로 처리해야 합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt",
+    "note": "전국 공통 성격의 내용이지만 현재 코퍼스에서는 [가이드]_울산시_분리배출_요령.txt 에만 서술돼 있어 region 을 그에 맞췄다. 환경부 공통 가이드에 보강하면 region=common 으로 되돌릴 것."
+  },
+  {
+    "id": "q092",
+    "type": "cross_reference",
+    "region": "jeju",
+    "question": "재활용품에 이물질이 섞이면 어떻게 되나요?",
+    "reference_answer": "쓰레기를 섞어 배출하면 재활용품까지 모두 쓰레기가 됩니다. 수거함에 다른 이물질을 넣으면 그 수거함의 재활용품 전체가 재활용되지 못하고 소각되거나 매립됩니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_제주_분리배출_요령.txt",
+    "note": "전국 공통 성격의 내용이지만 현재 코퍼스에서는 [가이드]_제주_분리배출_요령.txt 에만 서술돼 있어 region 을 그에 맞췄다. 환경부 공통 가이드에 보강하면 region=common 으로 되돌릴 것."
+  },
+  {
+    "id": "q093",
+    "type": "cross_reference",
+    "region": "ulsan",
+    "question": "분리배출 방법을 앱으로 확인할 수 있나요?",
+    "reference_answer": "'내 손안의 분리배출' 앱에서 품목별 배출 요령을 확인할 수 있으며 1:1 질문 기능도 제공합니다.",
+    "forbidden_mention": [],
+    "should_have_answer": true,
+    "region_explicit": false,
+    "source_doc": "[가이드]_울산시_분리배출_요령.txt",
+    "note": "전국 공통 성격의 내용이지만 현재 코퍼스에서는 [가이드]_울산시_분리배출_요령.txt 에만 서술돼 있어 region 을 그에 맞췄다. 환경부 공통 가이드에 보강하면 region=common 으로 되돌릴 것."
+  },
+  {
+    "id": "q094",
+    "type": "no_answer",
+    "region": "gwangju_bukgu",
+    "question": "광주 북구 재활용품 배출 요일은 언제인가요?",
+    "reference_answer": "광주 북구 자료는 보유하고 있지 않아 안내드릴 수 없습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false,
+    "region_explicit": true,
+    "note": "광주 문서를 추가하면 이 문항은 무효가 된다"
+  },
+  {
+    "id": "q095",
+    "type": "no_answer",
+    "region": "common",
+    "question": "폐어망이나 폐부표는 어디에 버리나요?",
+    "reference_answer": "해양폐기물 관련 자료는 보유하고 있지 않습니다.",
+    "forbidden_mention": [
+      "종량제봉투",
+      "대형폐기물"
+    ],
+    "should_have_answer": false,
+    "region_explicit": true,
+    "note": "생활폐기물 규칙을 해양폐기물에 유추 적용하면 오답"
+  },
+  {
+    "id": "q096",
+    "type": "no_answer",
+    "region": "common",
+    "question": "우리 공장 사업장폐기물 처리 업체 좀 추천해 주세요.",
+    "reference_answer": "사업장폐기물 처리업체 정보는 보유하고 있지 않습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false,
+    "region_explicit": true
+  },
+  {
+    "id": "q097",
+    "type": "no_answer",
+    "region": "common",
+    "question": "주식 투자는 어떻게 시작하나요?",
+    "reference_answer": "관련 자료를 찾을 수 없습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false,
+    "region_explicit": true,
+    "note": "3차 measure_threshold 의 무관 질문"
+  },
+  {
+    "id": "q098",
+    "type": "no_answer",
+    "region": "common",
+    "question": "회사 연차는 며칠까지 쓸 수 있나요?",
+    "reference_answer": "관련 자료를 찾을 수 없습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false,
+    "region_explicit": true,
+    "note": "시행령의 사업자 대상 절차 조항에 걸리기 쉬운 함정"
+  },
+  {
+    "id": "q099",
+    "type": "no_answer",
+    "region": "common",
+    "question": "건축 폐기물인 폐콘크리트는 어떻게 처리하나요?",
+    "reference_answer": "건설폐기물 처리 자료는 보유하고 있지 않습니다.",
+    "forbidden_mention": [
+      "종량제봉투",
+      "대형폐기물"
+    ],
+    "should_have_answer": false,
+    "region_explicit": true
+  },
+  {
+    "id": "q100",
+    "type": "no_answer",
+    "region": "common",
+    "question": "반려동물 배변패드는 어느 지자체가 따로 수거하나요?",
+    "reference_answer": "지자체별 배변패드 별도 수거 자료는 보유하고 있지 않습니다.",
+    "forbidden_mention": [],
+    "should_have_answer": false,
+    "region_explicit": true
   }
 ]
