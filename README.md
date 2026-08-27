@@ -124,6 +124,19 @@ SKN32-4th-3Team/
 
 ```bash
 uv venv --python 3.12 .venv
+uv pip install -r requirements.txt
+```
+
+**두 줄 다 Windows·macOS·Linux 에서 그대로 동작합니다.** `uv pip install` 은
+현재 디렉터리의 `.venv` 를 자동으로 찾으므로 활성화도, 인터프리터 경로를
+적는 것도 필요 없습니다.
+
+대상을 명시해야 한다면 경로가 OS 마다 다릅니다:
+
+```bash
+# Windows
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+# macOS/Linux
 uv pip install --python .venv/bin/python -r requirements.txt
 ```
 
