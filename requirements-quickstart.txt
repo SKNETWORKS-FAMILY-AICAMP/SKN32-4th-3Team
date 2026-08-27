@@ -7,3 +7,7 @@ Pillow
 faiss-cpu
 numpy
 pypdf
+# settings.MIDDLEWARE 가 무조건 로드합니다 — 없으면 runserver 가 뜨지 않습니다.
+whitenoise
+# rebuild_index() 가 RAG_PIPELINE 과 무관하게 호출합니다 — 없으면 rag_reindex 가 실패합니다.
+rank_bm25

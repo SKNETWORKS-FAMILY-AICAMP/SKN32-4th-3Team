@@ -35,6 +35,7 @@ whitenoise[brotli]
 faiss-cpu
 numpy
 pypdf
+rank_bm25
 
 # --- LLM / embeddings ---
 openai
