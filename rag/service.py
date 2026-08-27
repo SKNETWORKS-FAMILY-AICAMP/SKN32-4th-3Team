@@ -38,7 +38,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-from . import chunking, embeddings, vector_store
+from . import bm25_store, chunking, embeddings, scoring, vector_store
 
 # 소유자와 무관하게 전체 공개되는 문서 유형 (수집한 공공자료)
 # 버그 수정(2R-2): "apartment" 가 빠져 있어서 owner_id 필터가 단지 규정을
@@ -269,21 +269,11 @@ _LANGCHAIN_INDEX_DIR = "langchain"
 def _effective_min_score(min_score: float | None) -> float:
     """유사도 임계값을 결정한다.
 
-    백엔드마다 점수 스케일이 다르므로 같은 임계값을 쓸 수 없다.
-      - hash   : 표면 문자열 일치만 잡아 0.05~0.15 수준 → 전용 임계값 사용
-      - local  : sentence-transformers. 의미 기반이라 점수대가 높다
-      - gemini : 0.3~0.7 수준
-      - openai : 0.2~0.6 수준
-
-    hash 를 제외한 나머지는 RAG_MIN_SCORE 를 쓰되,
-    **백엔드를 바꾸면 manage.py measure_threshold 로 재측정해야 한다.**
-    (모델마다 유사도 분포가 달라 같은 값이 맞지 않는다)
+    파이프라인마다 score 스케일이 다르다는 문제가 생겨
+    판정 로직은 rag/scoring.py 로 옮겼다.
+    (RRF 는 순위 기반이라 이 임계값으로 판정하면 안 된다 — scoring.py 참고)
     """
-    if min_score is not None:
-        return min_score
-    if settings.EMBEDDING_BACKEND.lower() == "hash":
-        return settings.RAG_MIN_SCORE_LOCAL
-    return settings.RAG_MIN_SCORE
+    return scoring.effective_min_score(min_score)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -314,12 +304,16 @@ def _effective_min_score(min_score: float | None) -> float:
 #    manage.py measure_threshold 로 한 번 더 확인하십시오.
 
 
-def _retrieve(query: str, fetch_k: int) -> list[dict]:
+def _retrieve(query: str, fetch_k: int, region: str | None = None) -> list[dict]:
     """질문에 대한 후보 청크를 가져온다. 여기가 유일한 분기점이다.
 
-    반환 형식은 두 경로가 동일하다.
+    반환 형식은 네 경로가 동일하다.
         [{"content", "title", "document_id", "owner_id",
           "source_type", "region", "score"}, ...]
+
+    region 은 bm25/hybrid 에서만 쓴다. 후보 단계에서 다른 지역
+    문서를 빼두면 BM25 점수 경쟁이 줄어 지역 문서가 살아남는다.
+    (legacy/langchain 은 search() 의 사후 필터에 그대로 의존한다)
     """
     pipeline = settings.RAG_PIPELINE.lower()
 
@@ -335,13 +329,58 @@ def _retrieve(query: str, fetch_k: int) -> list[dict]:
         )
         return vector_store.search_with_langchain(store, query, fetch_k)
 
+    if pipeline == "bm25":
+        return bm25_store.search(query, fetch_k, region=region)
+
+    if pipeline == "hybrid":
+        query_vector = embeddings.embed_query(query)
+        dense = vector_store.search(query_vector, fetch_k)
+        sparse = bm25_store.search(query, fetch_k, region=region)
+        return _rrf_fuse(dense, sparse, fetch_k)
+
     if pipeline != "legacy":
         raise ValueError(
-            f"RAG_PIPELINE 값이 잘못되었습니다: {pipeline!r} (legacy 또는 langchain)"
+            f"RAG_PIPELINE 값이 잘못되었습니다: {pipeline!r} "
+            "(legacy, langchain, bm25, hybrid)"
         )
 
     query_vector = embeddings.embed_query(query)
     return vector_store.search(query_vector, fetch_k)
+
+
+def _rrf_fuse(dense: list[dict], sparse: list[dict], top_k: int) -> list[dict]:
+    """RRF(Reciprocal Rank Fusion)로 두 랭킹을 합친다.
+
+        score(d) = Σ 1 / (K + rank_i(d))
+
+    점수를 직접 더하지 않고 **순위만** 쓰는 이유:
+    코사인 유사도(0~1)와 BM25 raw(0~20+)는 스케일이 달라 정규화 없이는
+    더할 수 없고, 정규화 방식에 따라 결과가 흔들린다. 순위는 스케일이
+    없으므로 이 문제를 통째로 피한다.
+
+    ⚠️ 그 대가로 융합 점수는 **관련도를 뜻하지 않는다.** 무관한 질문에서도
+       1위 문서는 최댓값을 받는다. 그래서 임계값 판정은 여기서 보존한
+       vector_score / bm25_score 로 한다 — rag/scoring.py 참고.
+    """
+    k = scoring.rrf_k()
+    merged: dict[str, dict] = {}
+
+    for results, score_field in ((dense, "vector_score"), (sparse, "bm25_score")):
+        for rank, item in enumerate(results, 1):
+            key = f"{item.get('document_id')}::{item.get('chunk_index')}"
+            entry = merged.get(key)
+            if entry is None:
+                entry = dict(item)
+                entry["rrf_score"] = 0.0
+                merged[key] = entry
+            entry[score_field] = float(item.get("score", 0.0))
+            entry["rrf_score"] += 1.0 / (k + rank)
+
+    fused = sorted(merged.values(), key=lambda x: x["rrf_score"], reverse=True)
+    for item in fused:
+        item["rrf_score"] = round(item["rrf_score"], 6)
+        item["score"] = item["rrf_score"]
+    return fused[:top_k]
 
 
 # ─────────────────── 공개 API ───────────────────
@@ -379,12 +418,17 @@ def rebuild_index() -> dict:
     vectors = embeddings.embed_documents([c["content"] for c in chunks])
     count = vector_store.rebuild(chunks, vectors, embeddings.get_dimension())
 
+    # BM25 는 같은 chunks 로 만든다. 순서가 어긋나면 bm25_store.load() 가
+    # corpus_size 불일치로 막는다. 임베딩 API 를 쓰지 않으므로 비용 0.
+    bm25_store.rebuild(chunks)
+
     return {
         "documents": len(documents),
         "indexed_chunks": count,
         "source": settings.RAG_SOURCE,
         "embedding_backend": settings.EMBEDDING_BACKEND,
-        "pipeline": "legacy",
+        "pipeline": settings.RAG_PIPELINE.lower(),
+        "bm25_indexed": count,
     }
 
 
@@ -420,7 +464,7 @@ def search(
         + settings.RAG_TOP_K_COMMON
         + settings.RAG_TOP_K_LAW,
     ) * 25
-    results = _retrieve(query, fetch_k)
+    results = _retrieve(query, fetch_k, region=region)
 
     if owner_id is not None:
         results = [
@@ -448,7 +492,15 @@ def search(
     ]
 
     # 유사도 임계값 (환각 방지 1차 장치)
-    results = [r for r in results if r.get("score", 0.0) >= min_score]
+    #
+    # ⚠️ 파이프라인마다 score 스케일이 다르다. 예전엔 이 한 줄이
+    #    r["score"] >= min_score 였는데, hybrid 의 score 는 RRF(순위
+    #    역수의 합)라 이론상 최댓값이 2/(RRF_K+1) = 0.0328 이다.
+    #    RAG_MIN_SCORE(0.36)와 비교하면 전부 탈락해 모든 질문이
+    #    "관련 정보를 찾을 수 없습니다" 로 나간다. 반대로 bm25 의 raw
+    #    score 는 상한이 없어 0.36 으로는 아무것도 못 걸러 환각 방지가
+    #    무력화된다. 둘 다 에러 없이 조용히 일어난다.
+    results = scoring.filter_by_threshold(results, min_score, settings.RAG_PIPELINE)
 
     # 4차 추가분: 법령 문서에 시행일 정보를 붙인다 (점수/정렬에는 영향 없음).
     results = _annotate_law_status(results)
