@@ -160,6 +160,12 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
+> ⚠️ **Windows: 프로젝트를 영문 경로에 두십시오** (예: `C:\proj4`).
+> 경로에 한글이 섞이면 색인 단계에서
+> `Illegal byte sequence ... index.faiss for writing` 로 실패합니다 —
+> FAISS 가 C++ 에서 파일을 직접 열어 경로 인코딩을 넘기지 못하기 때문입니다.
+> 사용자명이 한글이면 바탕화면·다운로드 폴더도 해당합니다.
+
 ### 2. 의존성 설치
 
 ```bash
@@ -198,6 +204,15 @@ EMBEDDING_BACKEND=openai
 OPENAI_API_KEY=sk-...
 LLM_BACKEND=openai
 ```
+
+> 실사용 설정은 **MySQL 에 DB 를 먼저 만들어야** 합니다. Django 는 DB 를
+> 대신 만들어 주지 않습니다:
+>
+> ```sql
+> CREATE DATABASE ecora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+> ```
+>
+> `mysqlclient` 설치가 실패하면 위 [파이썬 버전 · 팀원 환경](#파이썬-버전--팀원-환경) 을 보십시오.
 
 ### 4. DB 초기화 및 실행
 
